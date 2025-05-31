@@ -72,7 +72,7 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
         <div className="flex justify-between items-center">
           <div>
             <CardTitle>HTML Preview (Page {currentPage})</CardTitle>
-            <CardDescription>AI-generated HTML representation of the current page.</CardDescription>
+            <CardDescription>Generated HTML for the current page.</CardDescription>
           </div>
           <Button onClick={handleExtractHtml} disabled={isExtracting || isLoading} size="sm">
             {isExtracting ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
