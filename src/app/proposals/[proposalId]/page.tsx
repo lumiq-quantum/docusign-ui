@@ -215,19 +215,6 @@ export default function ProposalDetailPage() {
           Back to Dashboard
         </Button>
         <div className="flex items-center gap-2">
-          {proposal.chatSessionId && (
-            <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Chat
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="sm:max-w-lg w-full p-0">
-                <ChatInterface sessionId={proposal.chatSessionId} chatTitleProp={`Chat: ${proposal.name}`} />
-              </SheetContent>
-            </Sheet>
-          )}
           <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm" disabled={isDeleting}>
@@ -332,8 +319,23 @@ export default function ProposalDetailPage() {
               )}
             </CardFooter>
           </Card>
+
+          {proposal.chatSessionId && (
+            <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Chat about Proposal
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="sm:max-w-lg w-full p-0">
+                <ChatInterface sessionId={proposal.chatSessionId} chatTitleProp={`Chat: ${proposal.name}`} />
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
       </div>
     </AppShell>
   );
 }
+
