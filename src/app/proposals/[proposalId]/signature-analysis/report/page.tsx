@@ -15,7 +15,7 @@ import type { Proposal } from '@/types';
 import { ArrowLeft, FileText } from 'lucide-react';
 
 // API_BASE_URL is needed to construct the iframe URL directly
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
 export default function SignatureAnalysisReportPage() {
   const params = useParams();

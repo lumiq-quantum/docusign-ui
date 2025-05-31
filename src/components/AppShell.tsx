@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -41,7 +40,7 @@ export function AppShell({ children, recentProposals = [] }: AppShellProps) {
 
   return (
     <SidebarProvider defaultOpen>
-      <div className="flex min-h-screen flex-col">
+      <div className="flex min-h-screen flex-col" style={{ width: "100%" }}>
         <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 justify-between">
           <div className="flex items-center gap-4">
             <div className="md:hidden">
@@ -58,7 +57,7 @@ export function AppShell({ children, recentProposals = [] }: AppShellProps) {
         </header>
         <div className="flex flex-1 w-full"> {/* Ensure this flex container itself takes full width */}
           <Sidebar className="border-r" collapsible="icon" side="left">
-            <SidebarContent asChild>
+            <SidebarContent> {/* Removed asChild */}
               <ScrollArea className="h-full">
                 <SidebarMenu className="p-2">
                   <SidebarMenuItem>
@@ -89,7 +88,6 @@ export function AppShell({ children, recentProposals = [] }: AppShellProps) {
                               <SidebarMenuButton
                                 asChild
                                 isActive={pathname === `/proposals/${proposal.id}`}
-                                variant="ghost"
                                 size="sm"
                                 className="justify-start"
                               >
@@ -106,24 +104,25 @@ export function AppShell({ children, recentProposals = [] }: AppShellProps) {
                 </SidebarMenu>
               </ScrollArea>
             </SidebarContent>
-            <SidebarFooter className="p-2">
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname === "/settings"} tooltip="Settings">
-                    <Link href="#"> {/* Replace # with actual settings path if needed */}
-                      <Settings />
-                      <span>Settings</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
+            <SidebarFooter className="p-2 group-data-[collapsible=icon]:hidden">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === "/settings"}
+                  tooltip="Settings"
+                >
+                  <Link href="#"> {/* Assuming settings page is not yet implemented */}
+                    <Settings />
+                    <span>Settings</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarFooter>
           </Sidebar>
-          <SidebarInset className="flex-1 overflow-y-auto">
-            <main className="p-4 md:p-6 lg:p-8 w-full"> {/* Ensure main content within inset takes full width */}
-              {children}
-            </main>
-          </SidebarInset>
+          {/* This is where the main content area for pages is defined */}
+          <main className="flex-1 w-full p-4 md:p-6 overflow-auto"> {/* Ensured w-full */}
+            {children}
+          </main>
         </div>
       </div>
     </SidebarProvider>

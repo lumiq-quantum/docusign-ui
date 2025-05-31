@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import type { Proposal, Document, Signature, Page, ProposalCreatePayload, ApiProposal, ApiDocument, ApiPage, ApiSignature } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
 // Log the detected API_BASE_URL when the module is loaded
 if (typeof window !== 'undefined') { // Client-side
