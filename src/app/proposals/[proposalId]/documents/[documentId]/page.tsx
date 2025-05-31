@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getProposalByIdAction, getProposalsAction } from '@/lib/actions';
-import type { Document, Proposal, Signature, Page } from '@/types';
+import type { Document, Proposal, Signature } from '@/types';
 import { ArrowLeft } from 'lucide-react';
 
 export default function DocumentViewerPage() {
@@ -77,8 +77,8 @@ export default function DocumentViewerPage() {
         setAllProposals(fetchedAllProposalsResult.proposals || []);
       }
 
-    } catch (e) {
-      setError("Failed to load document details.");
+    } catch (e: any) {
+      setError("Failed to load document details: " + e.message);
       console.error(e);
     } finally {
       setIsLoading(false);
@@ -107,7 +107,7 @@ export default function DocumentViewerPage() {
   if (isLoading) {
     return (
       <AppShell recentProposals={allProposals}>
-        <PageHeader title={<Skeleton className="h-8 w-3/4" />} />
+        <PageHeader title={<Skeleton className="h-8 w-3/4" />} description={<Skeleton className="h-4 w-1/2 mt-1" />} />
         <Skeleton className="h-[600px] w-full" />
       </AppShell>
     );

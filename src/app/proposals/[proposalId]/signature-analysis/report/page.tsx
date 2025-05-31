@@ -25,7 +25,7 @@ export default function SignatureAnalysisReportPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchReport = useCallback(async () => {
+  const fetchReportData = useCallback(async () => {
     if (!proposalIdStr) return;
     
     const numericProposalId = parseInt(proposalIdStr, 10);
@@ -41,16 +41,16 @@ export default function SignatureAnalysisReportPage() {
        const [fetchedProposalResult, reportResult, fetchedAllProposalsResult] = await Promise.all([
         getProposalByIdAction(numericProposalId),
         getSignatureAnalysisReportAction(numericProposalId),
-        getProposalsAction()
+        getProposalsAction() // For sidebar
       ]);
       
       if (fetchedProposalResult.error) {
-        setError(fetchedProposalResult.error);
+        setError(prevError => prevError ? `${prevError}\n${fetchedProposalResult.error}` : fetchedProposalResult.error); // Combine errors
         setProposal(null);
       } else if (fetchedProposalResult.proposal) {
         setProposal(fetchedProposalResult.proposal);
       } else {
-        setError("Proposal not found.");
+         setError(prevError => prevError ? `${prevError}\nProposal not found.` : "Proposal not found.");
         setProposal(null);
       }
 
@@ -68,8 +68,8 @@ export default function SignatureAnalysisReportPage() {
         setAllProposals(fetchedAllProposalsResult.proposals || []);
       }
 
-    } catch (e) {
-      setError("Failed to load signature analysis report.");
+    } catch (e: any) {
+      setError("Failed to load signature analysis report: " + e.message);
       console.error(e);
     } finally {
       setIsLoading(false);
@@ -77,8 +77,8 @@ export default function SignatureAnalysisReportPage() {
   }, [proposalIdStr]);
 
   useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+    fetchReportData();
+  }, [fetchReportData]);
 
   if (isLoading) {
     return (
@@ -92,7 +92,7 @@ export default function SignatureAnalysisReportPage() {
     );
   }
 
-  if (error && !reportHtml) { // Only show full page error if reportHtml couldn't be loaded at all
+  if (error && !reportHtml) { 
     return (
       <AppShell recentProposals={allProposals}>
         <PageHeader title="Error" />
@@ -104,7 +104,7 @@ export default function SignatureAnalysisReportPage() {
     );
   }
   
-  if (!proposal && !isLoading) { // If proposal specifically failed to load
+  if (!proposal && !isLoading && !error) { // If proposal specifically failed silently, or initial error was just about proposal
      return (
       <AppShell recentProposals={allProposals}>
         <PageHeader title="Not Found" />
@@ -121,17 +121,23 @@ export default function SignatureAnalysisReportPage() {
        <Button variant="outline" size="sm" asChild className="mb-4">
         <Link href={`/proposals/${proposal?.id || proposalIdStr}`}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Proposal: {proposal?.name || 'Loading...'}
+          Back to Proposal: {proposal?.name || 'Details'}
         </Link>
       </Button>
       <PageHeader
         title="Signature Analysis Report"
         description={`Detailed analysis for proposal: ${proposal?.name || 'N/A'} (${proposal?.applicationNumber || 'N/A'})`}
       />
-      {error && reportHtml && ( // Show non-critical error if reportHtml is still available
-         <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Report Loading Issue</AlertTitle>
+      {error && reportHtml && ( // Show non-critical error if reportHtml is still available (e.g., proposal details failed but report loaded)
+         <Alert variant="warning" className="mb-4">
+            <AlertTitle>Report Data Issue</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+       {error && !reportHtml && ( // If there was an error and report HTML is null explicitly
+         <Alert variant="destructive" className="mb-4">
+            <AlertTitle>Report Not Available</AlertTitle>
+            <AlertDescription>{error || "The signature analysis report could not be loaded."}</AlertDescription>
         </Alert>
       )}
       <Card>
@@ -147,9 +153,9 @@ export default function SignatureAnalysisReportPage() {
               className="prose dark:prose-invert max-w-none p-4 border rounded-md bg-background shadow"
               dangerouslySetInnerHTML={{ __html: reportHtml }} 
             />
-          ) : (
-            <p className="text-muted-foreground">Report content is currently unavailable.</p>
-          )}
+          ) : !isLoading ? ( // Show only if not loading and no reportHtml
+            <p className="text-muted-foreground">Report content is currently unavailable or could not be loaded.</p>
+          ) : null}
         </CardContent>
       </Card>
     </AppShell>

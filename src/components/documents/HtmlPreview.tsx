@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useTransition, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,7 +20,7 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false); // For fetching HTML
   const [error, setError] = useState<string | null>(null);
-  const [isExtracting, startExtractingTransition] = useTransition(); // For triggering extraction
+  const [isExtracting, setIsExtracting] = useState(false); // For triggering extraction
   const { toast } = useToast();
 
   const fetchHtmlContent = useCallback(async (pageToFetch: number) => {
@@ -30,43 +30,45 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
       const result = await getDocumentPageHtmlAction(proposalId, documentId, pageToFetch);
       if (result.error) {
         setError(result.error);
-        setHtmlContent(null); // Show "not available" or error message
+        // Don't set htmlContent to null if there was a previous successful fetch,
+        // unless the error specifically indicates content is gone (e.g. 404 after extraction)
+        if (result.html === "<p>HTML content not available for this page.</p>" || !htmlContent) {
+             setHtmlContent("<p>No HTML content available for this page.</p>");
+        }
       } else {
         setHtmlContent(result.html || "<p>No HTML content available for this page.</p>");
       }
-    } catch (e) {
-      setError("Failed to fetch HTML content.");
-      setHtmlContent(null);
+    } catch (e: any) {
+      setError("Failed to fetch HTML content: " + e.message);
+      setHtmlContent("<p>No HTML content available for this page.</p>");
     } finally {
       setIsLoading(false);
     }
-  }, [proposalId, documentId]);
+  }, [proposalId, documentId, htmlContent]); // Added htmlContent to dependency
 
   useEffect(() => {
     fetchHtmlContent(currentPage);
   }, [currentPage, fetchHtmlContent]);
 
-  const handleExtractHtml = () => {
-    startExtractingTransition(async () => {
-      // Removed setIsLoading(true) here as isExtracting covers the button state
-      setError(null);
-      // Don't clear htmlContent immediately, let fetchHtmlContent update it after extraction attempt
-      try {
-        // Pass currentPage to extractHtmlAction, assuming API can use it or it's for whole doc
-        const result = await extractHtmlAction(proposalId, documentId, currentPage); 
-        if (result.error) {
-          setError(result.error);
-          toast({ title: "Extraction Failed", description: result.error, variant: "destructive" });
-        } else {
-          toast({ title: "Extraction Triggered", description: result.message || "HTML extraction process has been started. Refresh content if needed." });
-          // Optionally, automatically refetch HTML after a delay
-          setTimeout(() => fetchHtmlContent(currentPage), 3000); // Give backend time
-        }
-      } catch (e) {
-        setError("An unexpected error occurred during HTML extraction.");
-        toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+  const handleExtractHtml = async () => {
+    setIsExtracting(true);
+    setError(null);
+    try {
+      const result = await extractHtmlAction(proposalId, documentId, currentPage); 
+      if (result.error) {
+        setError(result.error);
+        toast({ title: "Extraction Failed", description: result.error, variant: "destructive" });
+      } else {
+        toast({ title: "Extraction Triggered", description: result.message || "HTML extraction process has been started. Content will refresh shortly." });
+        // Automatically refetch HTML after a delay to allow backend processing
+        setTimeout(() => fetchHtmlContent(currentPage), 5000); // Increased delay
       }
-    });
+    } catch (e: any) {
+      setError("An unexpected error occurred during HTML extraction: " + e.message);
+      toast({ title: "Error", description: "An unexpected error occurred: " + e.message, variant: "destructive" });
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   return (
@@ -85,7 +87,7 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
       </CardHeader>
       <CardContent className="min-h-[200px] max-h-[400px] overflow-y-auto border rounded-md p-4 bg-muted/30">
         {isLoading && <Skeleton className="w-full h-[150px]" />}
-        {error && !isLoading && ( // Only show error if not loading
+        {error && !isLoading && (
           <Alert variant="destructive">
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
@@ -94,7 +96,7 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
         {!isLoading && !error && htmlContent && (
           <div dangerouslySetInnerHTML={{ __html: htmlContent }} className="prose dark:prose-invert max-w-none" />
         )}
-        {!isLoading && !error && !htmlContent && ( // Initial state before any content/error
+        {!isLoading && !error && !htmlContent && (
           <div className="text-center text-muted-foreground py-10">
             <p>Click "Extract HTML" to generate a preview, or content may not be available.</p>
           </div>

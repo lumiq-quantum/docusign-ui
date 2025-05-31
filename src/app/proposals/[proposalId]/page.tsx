@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useTransition } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
@@ -27,12 +27,12 @@ export default function ProposalDetailPage() {
   const [allProposals, setAllProposals] = useState<Proposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAnalyzing, startAnalyzingTransition] = useTransition();
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
 
   const fetchProposalDetails = useCallback(async () => {
     if (!proposalId) return;
-    // Ensure proposalId is a number for API call
+    
     const numericProposalId = parseInt(proposalId, 10);
     if (isNaN(numericProposalId)) {
         setError("Invalid Proposal ID format.");
@@ -43,9 +43,10 @@ export default function ProposalDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
+      // Fetch both proposal details and list of all proposals for sidebar concurrently
       const [fetchedProposalResult, fetchedAllProposalsResult] = await Promise.all([
         getProposalByIdAction(numericProposalId),
-        getProposalsAction()
+        getProposalsAction() // For sidebar
       ]);
 
       if (fetchedProposalResult.error) {
@@ -57,15 +58,14 @@ export default function ProposalDetailPage() {
       }
 
       if (fetchedAllProposalsResult.error) {
-        // Non-critical error, dashboard sidebar might be empty
         console.warn("Failed to load all proposals for sidebar:", fetchedAllProposalsResult.error);
         setAllProposals([]);
       } else {
         setAllProposals(fetchedAllProposalsResult.proposals || []);
       }
 
-    } catch (e) {
-      setError("Failed to load proposal details.");
+    } catch (e: any) {
+      setError("Failed to load proposal details: " + e.message);
       console.error(e);
     } finally {
       setIsLoading(false);
@@ -77,32 +77,37 @@ export default function ProposalDetailPage() {
   }, [fetchProposalDetails]);
 
   const handleUploadComplete = (newDocument: Document) => {
-    // Refetch proposal to include the new document from the backend's perspective
-    fetchProposalDetails();
+    fetchProposalDetails(); // Re-fetch to update list and proposal details
   };
 
-  const handleStartAnalysis = () => {
+  const handleStartAnalysis = async () => {
     if (!proposal) return;
-    startAnalyzingTransition(async () => {
+    setIsAnalyzing(true);
+    try {
       const result = await startSignatureAnalysisAction(proposal.id);
       if (result.error) {
         toast({ title: "Analysis Error", description: result.error, variant: "destructive" });
       } else {
         toast({ title: "Analysis Started", description: result.message || "Signature analysis is in progress." });
+        // Re-fetch to get updated status from backend
+        // Add a small delay to give backend time to update status potentially
+        setTimeout(fetchProposalDetails, 2000); 
       }
-      // Refetch to get updated status from backend
-      // Add a small delay to give backend time to update status potentially
-      setTimeout(fetchProposalDetails, 1000); 
-    });
+    } catch (e: any) {
+      toast({ title: "Analysis Error", description: "An unexpected error occurred: " + e.message, variant: "destructive" });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
   
   const SignatureStatusIndicator = () => {
     if (!proposal || !proposal.signatureAnalysisStatus) return <Badge variant="outline">Not Started</Badge>;
-    switch (proposal.signatureAnalysisStatus.toLowerCase()) { // API might return different casing
+    const status = proposal.signatureAnalysisStatus.toLowerCase();
+    switch (status) {
       case 'completed':
         return <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="mr-1 h-3 w-3" />Completed</Badge>;
       case 'in progress':
-      case 'inprogress': // common variations
+      case 'inprogress':
         return <Badge variant="secondary"><Clock className="mr-1 h-3 w-3 animate-spin" />In Progress</Badge>;
       case 'failed':
         return <Badge variant="destructive"><AlertCircle className="mr-1 h-3 w-3" />Failed</Badge>;
@@ -113,7 +118,7 @@ export default function ProposalDetailPage() {
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell recentProposals={allProposals}>
         <PageHeader title={<Skeleton className="h-8 w-3/4" />} description={<Skeleton className="h-4 w-1/2 mt-1" />} />
         <div className="space-y-6">
           <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
@@ -125,7 +130,7 @@ export default function ProposalDetailPage() {
 
   if (error) {
     return (
-      <AppShell>
+      <AppShell recentProposals={allProposals}>
         <PageHeader title="Error" />
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
@@ -137,7 +142,7 @@ export default function ProposalDetailPage() {
 
   if (!proposal) {
     return (
-      <AppShell>
+      <AppShell recentProposals={allProposals}>
         <PageHeader title="Proposal Not Found" />
          <Alert>
           <AlertTitle>Not Found</AlertTitle>

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useTransition, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import type { Document } from '@/types';
 import { addDocumentToProposalAction } from '@/lib/actions';
 
 interface DocumentUploadProps {
-  proposalId: number; // Changed from string
+  proposalId: number;
   onUploadComplete: (newDocument: Document) => void;
 }
 
@@ -24,7 +24,7 @@ interface UploadProgress {
 }
 
 export function DocumentUpload({ proposalId, onUploadComplete }: DocumentUploadProps) {
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
   const { toast } = useToast();
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,56 +47,58 @@ export function DocumentUpload({ proposalId, onUploadComplete }: DocumentUploadP
     }
   };
 
-  const handleUpload = (file: File) => {
+  const handleUpload = async (file: File) => {
     setUploadProgress({ fileName: file.name, progress: 0, status: 'uploading' });
+    setIsPending(true);
 
+    // Simulate progress for immediate feedback, actual progress depends on network
     let currentProgress = 0;
-    const interval = setInterval(() => {
+    const progressInterval = setInterval(() => {
       currentProgress += 10;
-      if (currentProgress <= 100) {
+      if (currentProgress <= 90) { // Stop at 90 to show completion after API call
         setUploadProgress(prev => prev ? { ...prev, progress: currentProgress } : null);
       } else {
-        clearInterval(interval);
+        clearInterval(progressInterval);
       }
     }, 100);
 
-    startTransition(async () => {
-      try {
-        const result = await addDocumentToProposalAction(proposalId, file);
-        clearInterval(interval); 
+    try {
+      const result = await addDocumentToProposalAction(proposalId, file);
+      clearInterval(progressInterval);
 
-        if (result.error || !result.document) {
-          setUploadProgress(prev => prev ? { ...prev, status: 'error', error: result.error || "Upload failed." } : null);
-          toast({
-            title: "Upload Failed",
-            description: result.error || "Could not upload the document.",
-            variant: "destructive",
-          });
-        } else {
-          setUploadProgress(prev => prev ? { ...prev, status: 'success', progress: 100 } : null);
-          toast({
-            title: "Upload Successful",
-            description: `${file.name} has been uploaded.`,
-          });
-          onUploadComplete(result.document);
-          setTimeout(() => {
-            setUploadProgress(null);
-            if (fileInputRef.current) {
-              fileInputRef.current.value = ""; 
-            }
-          }, 3000);
-        }
-      } catch (e) {
-        clearInterval(interval);
-        setUploadProgress(prev => prev ? { ...prev, status: 'error', error: "An unexpected error occurred." } : null);
+      if (result.error || !result.document) {
+        setUploadProgress(prev => prev ? { ...prev, status: 'error', error: result.error || "Upload failed.", progress: prev.progress > 50 ? prev.progress : 50  } : null);
         toast({
-          title: "Upload Error",
-          description: "An unexpected error occurred during upload.",
+          title: "Upload Failed",
+          description: result.error || "Could not upload the document.",
           variant: "destructive",
         });
-        console.error(e);
+      } else {
+        setUploadProgress(prev => prev ? { ...prev, status: 'success', progress: 100 } : null);
+        toast({
+          title: "Upload Successful",
+          description: `${file.name} has been uploaded.`,
+        });
+        onUploadComplete(result.document);
+        setTimeout(() => {
+          setUploadProgress(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = ""; 
+          }
+        }, 3000); // Keep success message for a bit
       }
-    });
+    } catch (e: any) {
+      clearInterval(progressInterval);
+      setUploadProgress(prev => prev ? { ...prev, status: 'error', error: "An unexpected error occurred: " + e.message } : null);
+      toast({
+        title: "Upload Error",
+        description: "An unexpected error occurred during upload: " + e.message,
+        variant: "destructive",
+      });
+      console.error(e);
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (

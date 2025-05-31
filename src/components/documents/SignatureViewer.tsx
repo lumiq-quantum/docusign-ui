@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Signature } from '@/types';
-import { getSignatureImageUrlAction } from '@/lib/actions';
+import { getSignatureImageUrlAction } from '@/lib/actions'; // This is a sync function now
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Maximize } from 'lucide-react';
 
@@ -18,34 +18,42 @@ interface SignatureViewerProps {
 export function SignatureViewer({ proposalId, signatures }: SignatureViewerProps) {
   const [selectedSignature, setSelectedSignature] = useState<Signature | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingImage, setIsLoadingImage] = useState(false); // For image loading itself
   const [error, setError] = useState<string|null>(null);
 
   useEffect(() => {
     if (selectedSignature) {
-      setIsLoading(true);
-      setImageUrl(null);
+      setIsLoadingImage(true); // For the new image load if signature changes
+      setImageUrl(null); // Clear previous image
       setError(null);
-      getSignatureImageUrlAction(proposalId, selectedSignature.id)
-        .then(result => {
-          if (result.imageUrl) {
-            setImageUrl(result.imageUrl);
-          } else {
-            setError(result.error || "Image URL not found.");
-            setImageUrl(null); 
-          }
-        })
-        .catch((e) => {
-          console.error("Error fetching signature image:", e);
-          setError("Failed to fetch signature image.");
-          setImageUrl(null);
-        })
-        .finally(() => setIsLoading(false));
+      
+      const result = getSignatureImageUrlAction(proposalId, selectedSignature.id);
+      
+      if (result.imageUrl) {
+        setImageUrl(result.imageUrl);
+        // isLoadingImage will be set to false by Image's onLoad or onError
+      } else {
+        setError(result.error || "Image URL could not be constructed.");
+        setImageUrl(null); 
+        setIsLoadingImage(false);
+      }
     } else {
       setImageUrl(null);
       setError(null);
+      setIsLoadingImage(false);
     }
   }, [selectedSignature, proposalId]);
+
+  const handleImageLoad = () => {
+    setIsLoadingImage(false);
+    setError(null);
+  };
+
+  const handleImageError = () => {
+    setIsLoadingImage(false);
+    setError(`Failed to load signature image for ID ${selectedSignature?.id}.`);
+    setImageUrl(null);
+  };
 
   if (!signatures || signatures.length === 0) {
     return (
@@ -85,22 +93,24 @@ export function SignatureViewer({ proposalId, signatures }: SignatureViewerProps
             {selectedSignature && (
                 <div className="border rounded-lg p-4 bg-muted/30">
                 <h4 className="font-medium mb-2">Viewing Signature {signatures.findIndex(s => s.id === selectedSignature.id) + 1}</h4>
-                {isLoading && <Skeleton className="w-full h-[100px] rounded-md" data-ai-hint="signature image" />}
-                {!isLoading && imageUrl && (
+                {isLoadingImage && <Skeleton className="w-full h-[100px] rounded-md" data-ai-hint="signature image loading" />}
+                {!isLoadingImage && imageUrl && (
                     <div className="relative group bg-white inline-block">
                         <Image 
                           src={imageUrl} 
                           alt={`Signature ${selectedSignature.id}`} 
                           width={200} height={80} 
-                          className="border" data-ai-hint="signature image" 
-                          unoptimized={true} // Assuming URL is direct API endpoint
+                          className="border" data-ai-hint="signature image content" 
+                          unoptimized={true} // API serves raw image
+                          onLoad={handleImageLoad}
+                          onError={handleImageError}
                         />
                         <Button variant="ghost" size="icon" className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => window.open(imageUrl, '_blank')}>
                             <Maximize className="h-4 w-4" />
                         </Button>
                     </div>
                 )}
-                {!isLoading && !imageUrl && <p className="text-sm text-destructive">{error || "Image not available."}</p>}
+                {!isLoadingImage && !imageUrl && <p className="text-sm text-destructive">{error || "Image not available."}</p>}
                 <p className="text-xs text-muted-foreground mt-2">ID: {selectedSignature.id}</p>
                 {selectedSignature.confidence !== undefined && selectedSignature.confidence !== null && (
                     <p className="text-xs text-muted-foreground">Confidence: {(selectedSignature.confidence * 100).toFixed(1)}%</p>

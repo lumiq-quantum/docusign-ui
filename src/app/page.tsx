@@ -10,7 +10,7 @@ import { getProposalsAction } from '@/lib/actions';
 import type { Proposal } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Search, FileText as FileTextIcon } from "lucide-react"; // Renamed to avoid conflict
+import { Search, FileText as FileTextIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 export default function DashboardPage() {
@@ -29,8 +29,8 @@ export default function DashboardPage() {
       } else {
         setProposals(result.proposals || []);
       }
-    } catch (e) {
-      setError("Failed to load proposals. Please try again later.");
+    } catch (e: any) {
+      setError("Failed to load proposals. Please try again later: " + e.message);
       console.error(e);
     } finally {
       setIsLoading(false);
