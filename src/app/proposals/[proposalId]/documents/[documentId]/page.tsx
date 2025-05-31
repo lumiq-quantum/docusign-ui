@@ -8,13 +8,13 @@ import { AppShell } from '@/components/AppShell';
 import { PageHeader } from '@/components/PageHeader';
 import { PdfViewer } from '@/components/documents/PdfViewer';
 import { HtmlPreview } from '@/components/documents/HtmlPreview';
-import { SignatureViewer } from '@/components/documents/SignatureViewer';
+// SignatureViewer import removed
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getProposalByIdAction, getProposalsAction } from '@/lib/actions';
-import type { Document, Proposal, Signature } from '@/types';
+import type { Document, Proposal } from '@/types'; // Signature type import removed as it's no longer used here
 import { ArrowLeft } from 'lucide-react';
 
 export default function DocumentViewerPage() {
@@ -29,7 +29,7 @@ export default function DocumentViewerPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPageNumber, setCurrentPageNumber] = useState(1);
-  const [signaturesOnPage, setSignaturesOnPage] = useState<Signature[]>([]);
+  // signaturesOnPage state and related logic removed
 
   const fetchDocumentDetails = useCallback(async () => {
     if (!proposalIdStr || !documentIdStr) return;
@@ -89,14 +89,7 @@ export default function DocumentViewerPage() {
     fetchDocumentDetails();
   }, [fetchDocumentDetails]);
   
-  useEffect(() => {
-    if (document && proposal?.signatureAnalysisStatus?.toLowerCase() === 'completed') {
-      const currentPageData = document.pages.find(p => p.pageNumber === currentPageNumber);
-      setSignaturesOnPage(currentPageData?.signatures || []);
-    } else {
-      setSignaturesOnPage([]);
-    }
-  }, [currentPageNumber, document, proposal?.signatureAnalysisStatus]);
+  // useEffect for signaturesOnPage removed
 
   const handlePageChange = (newPage: number) => {
     if (document && newPage >= 1 && newPage <= document.totalPages) {
@@ -153,8 +146,9 @@ export default function DocumentViewerPage() {
           <TabsTrigger value="html-preview">HTML Preview</TabsTrigger>
         </TabsList>
         <TabsContent value="pdf-view" className="mt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+          {/* Grid layout adjusted for PdfViewer to take full width */}
+          <div className="grid grid-cols-1"> 
+            <div> {/* PdfViewer now takes the full span */}
               <PdfViewer
                 proposalId={proposal.id}
                 documentId={document.id}
@@ -163,9 +157,7 @@ export default function DocumentViewerPage() {
                 onPageChange={handlePageChange}
               />
             </div>
-            <div className="lg:col-span-1">
-              <SignatureViewer proposalId={proposal.id} signatures={signaturesOnPage} />
-            </div>
+            {/* SignatureViewer component removed from here */}
           </div>
         </TabsContent>
         <TabsContent value="html-preview" className="mt-4">
