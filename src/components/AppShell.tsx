@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -55,7 +56,7 @@ export function AppShell({ children, recentProposals = [] }: AppShellProps) {
           </div>
           <UserNav />
         </header>
-        <div className="flex flex-1">
+        <div className="flex flex-1 w-full"> {/* Ensure this flex container itself takes full width */}
           <Sidebar className="border-r" collapsible="icon" side="left">
             <SidebarContent asChild>
               <ScrollArea className="h-full">
@@ -119,7 +120,7 @@ export function AppShell({ children, recentProposals = [] }: AppShellProps) {
             </SidebarFooter>
           </Sidebar>
           <SidebarInset className="flex-1 overflow-y-auto">
-            <main className="p-4 md:p-6 lg:p-8">
+            <main className="p-4 md:p-6 lg:p-8 w-full"> {/* Ensure main content within inset takes full width */}
               {children}
             </main>
           </SidebarInset>
