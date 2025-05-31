@@ -10,22 +10,26 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getProposalByIdAction, getProposalsAction, getSignatureAnalysisReportAction } from '@/lib/actions';
+import { getProposalByIdAction, getProposalsAction } from '@/lib/actions';
 import type { Proposal } from '@/types';
 import { ArrowLeft, FileText } from 'lucide-react';
+
+// API_BASE_URL is needed to construct the iframe URL directly
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 export default function SignatureAnalysisReportPage() {
   const params = useParams();
   const router = useRouter();
   const proposalIdStr = params.proposalId as string;
 
-  const [reportHtml, setReportHtml] = useState<string | null>(null);
+  const [reportUrl, setReportUrl] = useState<string | null>(null);
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [allProposals, setAllProposals] = useState<Proposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); // For proposal fetching errors
+  const [iframeError, setIframeError] = useState<string | null>(null); // For iframe specific issues
 
-  const fetchReportData = useCallback(async () => {
+  const fetchProposalDetailsAndSetReportUrl = useCallback(async () => {
     if (!proposalIdStr) return;
     
     const numericProposalId = parseInt(proposalIdStr, 10);
@@ -35,30 +39,32 @@ export default function SignatureAnalysisReportPage() {
         return;
     }
 
+    if (!API_BASE_URL) {
+      setIframeError("API base URL is not configured. Cannot load report.");
+      setIsLoading(false);
+      return;
+    }
+    setReportUrl(`${API_BASE_URL}/proposals/${numericProposalId}/signature-analysis/report`);
+
+
     setIsLoading(true);
-    setError(null);
+    setError(null); // Reset proposal error
+    setIframeError(null); // Reset iframe error
+
     try {
-       const [fetchedProposalResult, reportResult, fetchedAllProposalsResult] = await Promise.all([
+       const [fetchedProposalResult, fetchedAllProposalsResult] = await Promise.all([
         getProposalByIdAction(numericProposalId),
-        getSignatureAnalysisReportAction(numericProposalId),
         getProposalsAction() // For sidebar
       ]);
       
       if (fetchedProposalResult.error) {
-        setError(prevError => prevError ? `${prevError}\n${fetchedProposalResult.error}` : fetchedProposalResult.error); // Combine errors
+        setError(fetchedProposalResult.error);
         setProposal(null);
       } else if (fetchedProposalResult.proposal) {
         setProposal(fetchedProposalResult.proposal);
       } else {
-         setError(prevError => prevError ? `${prevError}\nProposal not found.` : "Proposal not found.");
+        setError("Proposal not found.");
         setProposal(null);
-      }
-
-      if (reportResult.error) {
-        setError(prevError => prevError ? `${prevError}\n${reportResult.error}` : reportResult.error);
-        setReportHtml(null);
-      } else {
-        setReportHtml(reportResult.reportHtml || "<p>Report content is not available.</p>");
       }
 
       if (fetchedAllProposalsResult.error) {
@@ -69,7 +75,7 @@ export default function SignatureAnalysisReportPage() {
       }
 
     } catch (e: any) {
-      setError("Failed to load signature analysis report: " + e.message);
+      setError("Failed to load proposal details: " + e.message);
       console.error(e);
     } finally {
       setIsLoading(false);
@@ -77,8 +83,8 @@ export default function SignatureAnalysisReportPage() {
   }, [proposalIdStr]);
 
   useEffect(() => {
-    fetchReportData();
-  }, [fetchReportData]);
+    fetchProposalDetailsAndSetReportUrl();
+  }, [fetchProposalDetailsAndSetReportUrl]);
 
   if (isLoading) {
     return (
@@ -86,36 +92,24 @@ export default function SignatureAnalysisReportPage() {
         <PageHeader title="Signature Analysis Report" description={<Skeleton className="h-4 w-1/2 mt-1" />} />
         <Card>
           <CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader>
-          <CardContent><Skeleton className="h-64 w-full" /></CardContent>
+          <CardContent><Skeleton className="h-[600px] w-full" /></CardContent>
         </Card>
       </AppShell>
     );
   }
-
-  if (error && !reportHtml) { 
+  
+  if (error && !proposal) { // Critical error fetching proposal
     return (
       <AppShell recentProposals={allProposals}>
         <PageHeader title="Error" />
         <Alert variant="destructive">
-          <AlertTitle>Error Loading Report</AlertTitle>
+          <AlertTitle>Error Loading Proposal Details</AlertTitle>
           <AlertDescription>{error} <Button variant="link" onClick={() => router.push(`/proposals/${proposalIdStr}`)}>Back to Proposal</Button></AlertDescription>
         </Alert>
       </AppShell>
     );
   }
   
-  if (!proposal && !isLoading && !error) { // If proposal specifically failed silently, or initial error was just about proposal
-     return (
-      <AppShell recentProposals={allProposals}>
-        <PageHeader title="Not Found" />
-         <Alert>
-          <AlertTitle>Proposal Not Found</AlertTitle>
-          <AlertDescription>The proposal related to this report could not be found. <Button variant="link" onClick={() => router.push('/')}>Go to Dashboard</Button></AlertDescription>
-        </Alert>
-      </AppShell>
-    );
-  }
-
   return (
     <AppShell recentProposals={allProposals}>
        <Button variant="outline" size="sm" asChild className="mb-4">
@@ -128,16 +122,16 @@ export default function SignatureAnalysisReportPage() {
         title="Signature Analysis Report"
         description={`Detailed analysis for proposal: ${proposal?.name || 'N/A'} (${proposal?.applicationNumber || 'N/A'})`}
       />
-      {error && reportHtml && ( // Show non-critical error if reportHtml is still available (e.g., proposal details failed but report loaded)
+      {error && proposal && ( // Non-critical error if proposal details somehow failed but we still have a URL
          <Alert variant="warning" className="mb-4">
-            <AlertTitle>Report Data Issue</AlertTitle>
+            <AlertTitle>Proposal Data Issue</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-       {error && !reportHtml && ( // If there was an error and report HTML is null explicitly
+       {iframeError && ( 
          <Alert variant="destructive" className="mb-4">
             <AlertTitle>Report Not Available</AlertTitle>
-            <AlertDescription>{error || "The signature analysis report could not be loaded."}</AlertDescription>
+            <AlertDescription>{iframeError}</AlertDescription>
         </Alert>
       )}
       <Card>
@@ -147,14 +141,19 @@ export default function SignatureAnalysisReportPage() {
             Report Details
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          {reportHtml ? (
-            <div 
-              className="prose dark:prose-invert max-w-none p-4 border rounded-md bg-background shadow"
-              dangerouslySetInnerHTML={{ __html: reportHtml }} 
+        <CardContent className="p-0">
+          {reportUrl && !iframeError ? (
+            <iframe
+              src={reportUrl}
+              title="Signature Analysis Report"
+              className="w-full h-[70vh] min-h-[600px] border-0 rounded-b-md"
+              sandbox="allow-scripts allow-same-origin" // Adjust sandbox as necessary
+              data-ai-hint="signature analysis report content"
             />
-          ) : !isLoading ? ( // Show only if not loading and no reportHtml
-            <p className="text-muted-foreground">Report content is currently unavailable or could not be loaded.</p>
+          ) : !isLoading && !iframeError ? ( 
+            <div className="p-6">
+              <p className="text-muted-foreground">Report content is currently unavailable or could not be loaded.</p>
+            </div>
           ) : null}
         </CardContent>
       </Card>

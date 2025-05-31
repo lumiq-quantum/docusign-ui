@@ -2,11 +2,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { getDocumentPagePdfUrlAction } from '@/lib/actions'; // This is a sync function now
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getDocumentPagePdfUrlAction } from '@/lib/actions'; 
 
 interface PdfViewerProps {
   proposalId: number;
@@ -17,64 +16,37 @@ interface PdfViewerProps {
 }
 
 export function PdfViewer({ proposalId, documentId, totalPages, currentPage, onPageChange }: PdfViewerProps) {
-  const [pageImageUrl, setPageImageUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Still useful for image load, not API call
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true); 
   const [error, setError] = useState<string | null>(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
 
-  const fetchPageImage = useCallback(() => {
-    setIsLoading(true); // For the visual loading state of the image itself
+  const fetchPagePdfUrl = useCallback(() => {
+    setIsLoading(true); 
     setError(null);
     
     const result = getDocumentPagePdfUrlAction(proposalId, documentId, currentPage);
     
     if (result.error || !result.url) {
-      setError(result.error || "Failed to construct page image URL.");
-      setPageImageUrl(null);
-      setIsLoading(false); // Stop loading if URL construction fails
+      setError(result.error || "Failed to construct page PDF URL.");
+      setPdfUrl(null);
+      setIsLoading(false); 
     } else {
-      setPageImageUrl(result.url);
-      // setIsLoading(false) will be handled by Image component's onLoad/onError
+      setPdfUrl(result.url);
+      // setIsLoading(false) will be handled by object's onload/onerror or iframe might not have reliable one
+      // For simplicity, we'll set loading to false after a short delay or assume it loads quickly.
+      // A more robust solution for iframe/object loading state is complex.
+      setTimeout(() => setIsLoading(false), 500); // Simulate load complete
     }
   }, [proposalId, documentId, currentPage]);
 
   useEffect(() => {
-    fetchPageImage();
-  }, [currentPage, fetchPageImage]);
-
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 2));
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
-  const handleResetZoom = () => setZoomLevel(1);
-
-  const handleImageLoad = () => {
-    setIsLoading(false);
-    setError(null);
-  };
-
-  const handleImageError = () => {
-    setIsLoading(false);
-    setError(`Failed to load image for page ${currentPage}. Check network or API response.`);
-    setPageImageUrl(null); // Clear broken image URL
-  };
-
+    fetchPagePdfUrl();
+  }, [currentPage, fetchPagePdfUrl]);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between p-2 border-b bg-card rounded-t-lg">
-        <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={handleZoomOut} disabled={zoomLevel <= 0.5 || isLoading}>
-                <ZoomOut className="h-4 w-4" />
-                <span className="sr-only">Zoom Out</span>
-            </Button>
-            <Button variant="outline" size="icon" onClick={handleZoomIn} disabled={zoomLevel >= 2 || isLoading}>
-                <ZoomIn className="h-4 w-4" />
-                <span className="sr-only">Zoom In</span>
-            </Button>
-            <Button variant="outline" size="icon" onClick={handleResetZoom} disabled={zoomLevel === 1 || isLoading}>
-                <RotateCcw className="h-4 w-4" />
-                <span className="sr-only">Reset Zoom</span>
-            </Button>
-        </div>
+      <div className="flex items-center justify-end p-2 border-b bg-card rounded-t-lg">
+        {/* Zoom controls removed as browser's PDF viewer will handle this */}
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -100,25 +72,26 @@ export function PdfViewer({ proposalId, documentId, totalPages, currentPage, onP
         </div>
       </div>
 
-      <div className="p-2 bg-muted/50 rounded-b-lg overflow-auto min-h-[600px] flex items-center justify-center">
+      <div className="p-2 bg-muted/50 rounded-b-lg min-h-[600px] flex items-center justify-center">
         {isLoading && <Skeleton className="w-full h-[700px] max-w-[800px]" data-ai-hint="document page loading" />}
         {error && !isLoading && <div className="text-red-500 text-center py-10">{error}</div>}
-        {!isLoading && !error && pageImageUrl && (
-          <Image
-            src={pageImageUrl}
-            alt={`Document Page ${currentPage}`}
-            width={800} 
-            height={1100} 
+        {!isLoading && !error && pdfUrl && (
+          <object
+            data={pdfUrl}
+            type="application/pdf"
+            width="100%"
+            height="700px" // Adjust height as needed
             className="shadow-lg border"
-            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center center', width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: `calc(100vh - 200px)` }}
-            data-ai-hint="document page content"
-            priority={true} // For LCP
-            unoptimized={true} // API serves raw image, no Next.js optimization needed/possible
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-          />
+            aria-label={`Document Page ${currentPage} PDF`}
+            data-ai-hint="document page content pdf"
+          >
+            <p className="p-4 text-center">
+              It appears your browser does not support embedding PDFs. 
+              You can <a href={pdfUrl} download className="underline text-primary">download the PDF</a> instead.
+            </p>
+          </object>
         )}
-         {!isLoading && !error && !pageImageUrl && (
+         {!isLoading && !error && !pdfUrl && (
           <div className="text-muted-foreground text-center py-10">Page content not available or URL construction failed.</div>
         )}
       </div>

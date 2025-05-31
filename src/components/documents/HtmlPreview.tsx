@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Wand2, RefreshCw } from 'lucide-react';
-import { extractHtmlAction, getDocumentPageHtmlAction } from '@/lib/actions';
+import { extractHtmlAction, getDocumentPageHtmlViewUrlAction } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 
 interface HtmlPreviewProps {
@@ -17,42 +17,35 @@ interface HtmlPreviewProps {
 }
 
 export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreviewProps) {
-  const [htmlContent, setHtmlContent] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // For fetching HTML
+  const [htmlViewUrl, setHtmlViewUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false); // For loading the iframe URL
   const [error, setError] = useState<string | null>(null);
   const [isExtracting, setIsExtracting] = useState(false); // For triggering extraction
   const { toast } = useToast();
+  const [iframeKey, setIframeKey] = useState(Date.now()); // To force iframe reload
 
-  const fetchHtmlContent = useCallback(async (pageToFetch: number) => {
+  const prepareHtmlViewUrl = useCallback(() => {
     setIsLoading(true);
     setError(null);
-    try {
-      const result = await getDocumentPageHtmlAction(proposalId, documentId, pageToFetch);
-      if (result.error) {
-        setError(result.error);
-        // Don't set htmlContent to null if there was a previous successful fetch,
-        // unless the error specifically indicates content is gone (e.g. 404 after extraction)
-        if (result.html === "<p>HTML content not available for this page.</p>" || !htmlContent) {
-             setHtmlContent("<p>No HTML content available for this page.</p>");
-        }
-      } else {
-        setHtmlContent(result.html || "<p>No HTML content available for this page.</p>");
-      }
-    } catch (e: any) {
-      setError("Failed to fetch HTML content: " + e.message);
-      setHtmlContent("<p>No HTML content available for this page.</p>");
-    } finally {
-      setIsLoading(false);
+    const result = getDocumentPageHtmlViewUrlAction(proposalId, documentId, currentPage);
+    if (result.error || !result.url) {
+      setError(result.error || "Failed to construct HTML view URL.");
+      setHtmlViewUrl(null);
+    } else {
+      setHtmlViewUrl(result.url);
+      setIframeKey(Date.now()); // Change key to force iframe reload
     }
-  }, [proposalId, documentId, htmlContent]); // Added htmlContent to dependency
+    // Simulate iframe loading, actual loading is handled by the browser
+    setTimeout(() => setIsLoading(false), 500); 
+  }, [proposalId, documentId, currentPage]);
 
   useEffect(() => {
-    fetchHtmlContent(currentPage);
-  }, [currentPage, fetchHtmlContent]);
+    prepareHtmlViewUrl();
+  }, [currentPage, prepareHtmlViewUrl]);
 
   const handleExtractHtml = async () => {
     setIsExtracting(true);
-    setError(null);
+    setError(null); // Clear previous errors
     try {
       const result = await extractHtmlAction(proposalId, documentId, currentPage); 
       if (result.error) {
@@ -60,8 +53,10 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
         toast({ title: "Extraction Failed", description: result.error, variant: "destructive" });
       } else {
         toast({ title: "Extraction Triggered", description: result.message || "HTML extraction process has been started. Content will refresh shortly." });
-        // Automatically refetch HTML after a delay to allow backend processing
-        setTimeout(() => fetchHtmlContent(currentPage), 5000); // Increased delay
+        // Re-prepare the URL and refresh iframe after a delay
+        setTimeout(() => {
+          prepareHtmlViewUrl();
+        }, 5000); 
       }
     } catch (e: any) {
       setError("An unexpected error occurred during HTML extraction: " + e.message);
@@ -81,23 +76,32 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
           </div>
           <Button onClick={handleExtractHtml} disabled={isExtracting || isLoading} size="sm">
             {isExtracting ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-            {htmlContent && htmlContent !== "<p>No HTML content available for this page.</p>" ? "Re-extract HTML" : "Extract HTML"}
+            {htmlViewUrl ? "Re-extract HTML" : "Extract HTML"}
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="min-h-[200px] max-h-[400px] overflow-y-auto border rounded-md p-4 bg-muted/30">
-        {isLoading && <Skeleton className="w-full h-[150px]" />}
+      <CardContent className="min-h-[400px] max-h-[600px] overflow-hidden border rounded-md p-0 bg-muted/30">
+        {isLoading && <Skeleton className="w-full h-full min-h-[380px]" />}
         {error && !isLoading && (
-          <Alert variant="destructive">
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <div className="p-4">
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </div>
         )}
-        {!isLoading && !error && htmlContent && (
-          <div dangerouslySetInnerHTML={{ __html: htmlContent }} className="prose dark:prose-invert max-w-none" />
+        {!isLoading && !error && htmlViewUrl && (
+          <iframe
+            key={iframeKey}
+            src={htmlViewUrl}
+            title={`HTML Preview for Page ${currentPage}`}
+            className="w-full h-full min-h-[380px] border-0"
+            sandbox="allow-same-origin" // Adjust sandbox attributes as needed for security vs functionality
+            data-ai-hint="document page html content"
+          />
         )}
-        {!isLoading && !error && !htmlContent && (
-          <div className="text-center text-muted-foreground py-10">
+        {!isLoading && !error && !htmlViewUrl && (
+          <div className="text-center text-muted-foreground py-10 p-4">
             <p>Click "Extract HTML" to generate a preview, or content may not be available.</p>
           </div>
         )}
