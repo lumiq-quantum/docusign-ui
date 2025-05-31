@@ -13,10 +13,21 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getProposalByIdAction, getProposalsAction, startSignatureAnalysisAction } from '@/lib/actions';
+import { getProposalByIdAction, getProposalsAction, startSignatureAnalysisAction, deleteProposalAction } from '@/lib/actions';
 import type { Proposal, Document } from '@/types';
-import { ArrowLeft, FileText, BarChart, CheckCircle, Clock, AlertCircle, RefreshCw, FileSearch } from 'lucide-react';
+import { ArrowLeft, FileText, BarChart, CheckCircle, Clock, AlertCircle, RefreshCw, FileSearch, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function ProposalDetailPage() {
   const params = useParams();
@@ -29,6 +40,8 @@ export default function ProposalDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchProposalData = useCallback(async (isFullLoad = true) => {
@@ -49,7 +62,7 @@ export default function ProposalDetailPage() {
     }
 
     try {
-      const promises = [getProposalByIdAction(numericProposalId)];
+      const promises: [Promise<{ proposal?: Proposal; error?: string }>, Promise<{ proposals?: Proposal[]; error?: string }>?] = [getProposalByIdAction(numericProposalId)];
       if (isFullLoad) {
         promises.push(getProposalsAction());
       }
@@ -68,7 +81,7 @@ export default function ProposalDetailPage() {
 
       }
 
-      if (isFullLoad) {
+      if (isFullLoad && results[1]) {
         const fetchedAllProposalsResult = results[1] as { proposals?: Proposal[]; error?: string };
         if (fetchedAllProposalsResult.error) {
           console.warn("Failed to load all proposals for sidebar:", fetchedAllProposalsResult.error);
@@ -89,11 +102,11 @@ export default function ProposalDetailPage() {
   }, [proposalId, toast]);
 
   useEffect(() => {
-    fetchProposalData(true); // Initial full load
+    fetchProposalData(true); 
   }, [fetchProposalData]);
 
   const handleUploadComplete = (newDocument: Document) => {
-    fetchProposalData(false); // Re-fetch only proposal to update list and details
+    fetchProposalData(false); 
   };
 
   const handleStartAnalysis = async () => {
@@ -105,7 +118,6 @@ export default function ProposalDetailPage() {
         toast({ title: "Analysis Error", description: result.error, variant: "destructive" });
       } else {
         toast({ title: "Analysis Started", description: result.message || "Signature analysis is in progress." });
-        // Refresh proposal data after a delay to allow backend processing
         setTimeout(() => fetchProposalData(false), 3000); 
       }
     } catch (e: any) {
@@ -113,6 +125,27 @@ export default function ProposalDetailPage() {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleDeleteProposal = async () => {
+    if (!proposal) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteProposalAction(proposal.id);
+      if (result.success) {
+        toast({ title: "Proposal Deleted", description: `Proposal "${proposal.name}" has been deleted.` });
+        router.push('/'); // Redirect to dashboard
+      } else {
+        toast({ title: "Error Deleting", description: result.error || "Failed to delete proposal.", variant: "destructive" });
+        setIsDeleting(false);
+        setIsDeleteAlertOpen(false);
+      }
+    } catch (e:any) {
+      toast({ title: "Error", description: "An unexpected error occurred: " + e.message, variant: "destructive" });
+      setIsDeleting(false);
+      setIsDeleteAlertOpen(false);
+    }
+    // No finally for setIsDeleting and setIsDeleteAlertOpen as it's handled on error or success navigation
   };
   
   const SignatureStatusIndicator = () => {
@@ -175,10 +208,35 @@ export default function ProposalDetailPage() {
 
   return (
     <AppShell recentProposals={allProposals}>
-      <Button variant="outline" size="sm" onClick={() => router.push('/')} className="mb-4">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Dashboard
-      </Button>
+      <div className="flex justify-between items-center mb-4">
+        <Button variant="outline" size="sm" onClick={() => router.push('/')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Dashboard
+        </Button>
+        <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm" disabled={isDeleting}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              {isDeleting ? "Deleting..." : "Delete Proposal"}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the proposal "{proposal.name}" and all associated documents.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteProposal} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                 {isDeleting ? "Deleting..." : "Yes, delete proposal"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
       <PageHeader
         title={proposal.name}
         description={`Application No: ${proposal.applicationNumber || 'N/A'} | Created: ${new Date(proposal.createdAt).toLocaleDateString()}`}

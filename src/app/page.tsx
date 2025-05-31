@@ -26,11 +26,13 @@ export default function DashboardPage() {
       const result = await getProposalsAction();
       if (result.error) {
         setError(result.error);
+        setProposals([]);
       } else {
         setProposals(result.proposals || []);
       }
     } catch (e: any) {
       setError("Failed to load proposals. Please try again later: " + e.message);
+      setProposals([]);
       console.error(e);
     } finally {
       setIsLoading(false);
@@ -40,6 +42,17 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchProposals();
   }, [fetchProposals]);
+
+  const handleProposalCreated = () => {
+    fetchProposals(); // Re-fetch proposals when a new one is created
+  };
+
+  const handleProposalDeleted = (deletedProposalId: number) => {
+    setProposals(prevProposals => prevProposals.filter(p => p.id !== deletedProposalId));
+    // Optionally, you can re-fetch all proposals from the server to ensure consistency
+    // fetchProposals(); 
+  };
+
 
   const filteredProposals = proposals.filter(proposal =>
     proposal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -51,7 +64,7 @@ export default function DashboardPage() {
       <PageHeader
         title="Proposals Dashboard"
         description="Manage your proposals and documents."
-        actions={<CreateProposalDialog onProposalCreated={fetchProposals} />}
+        actions={<CreateProposalDialog onProposalCreated={handleProposalCreated} />}
       />
       
       <div className="mb-4">
@@ -91,7 +104,7 @@ export default function DashboardPage() {
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredProposals.map((proposal) => (
-            <ProposalCard key={proposal.id} proposal={proposal} />
+            <ProposalCard key={proposal.id} proposal={proposal} onProposalDeleted={handleProposalDeleted} />
           ))}
         </div>
       )}
