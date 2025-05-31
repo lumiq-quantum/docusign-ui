@@ -282,7 +282,7 @@ export default function ProposalDetailPage() {
                 </div>
                 <SignatureStatusIndicator />
               </div>
-              {isCompletedSuccessfully && proposal.signatureAnalysisReportHtml && (
+              {isCompletedSuccessfully && (
                  <Alert className="mb-3">
                   <CheckCircle className="h-4 w-4" />
                   <AlertTitle>Analysis Complete</AlertTitle>
