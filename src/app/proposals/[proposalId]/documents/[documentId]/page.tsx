@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -12,50 +13,69 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getDocumentById, getProposalById, getProposals } from '@/lib/mockData';
-import type { Document, Proposal, Signature } from '@/types';
+import { getProposalByIdAction, getProposalsAction } from '@/lib/actions';
+import type { Document, Proposal, Signature, Page } from '@/types';
 import { ArrowLeft } from 'lucide-react';
 
 export default function DocumentViewerPage() {
   const params = useParams();
   const router = useRouter();
-  const proposalId = params.proposalId as string;
-  const documentId = params.documentId as string;
+  const proposalIdStr = params.proposalId as string;
+  const documentIdStr = params.documentId as string;
 
   const [document, setDocument] = useState<Document | null>(null);
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [allProposals, setAllProposals] = useState<Proposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  // Mock signatures for the current page, in a real app this would come from analysis results
+  const [currentPageNumber, setCurrentPageNumber] = useState(1);
   const [signaturesOnPage, setSignaturesOnPage] = useState<Signature[]>([]);
 
   const fetchDocumentDetails = useCallback(async () => {
-    if (!proposalId || !documentId) return;
+    if (!proposalIdStr || !documentIdStr) return;
+
+    const numericProposalId = parseInt(proposalIdStr, 10);
+    const numericDocumentId = parseInt(documentIdStr, 10);
+
+    if (isNaN(numericProposalId) || isNaN(numericDocumentId)) {
+      setError("Invalid ID format.");
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
-      const [fetchedDoc, fetchedProposal, fetchedAllProposals] = await Promise.all([
-        getDocumentById(proposalId, documentId),
-        getProposalById(proposalId),
-        getProposals() // For sidebar
+      const [fetchedProposalResult, fetchedAllProposalsResult] = await Promise.all([
+        getProposalByIdAction(numericProposalId),
+        getProposalsAction() 
       ]);
 
-      if (fetchedDoc) {
-        setDocument(fetchedDoc);
+      if (fetchedProposalResult.error) {
+        setError(fetchedProposalResult.error);
+        setProposal(null);
+        setDocument(null);
+      } else if (fetchedProposalResult.proposal) {
+        setProposal(fetchedProposalResult.proposal);
+        const foundDoc = fetchedProposalResult.proposal.documents.find(d => d.id === numericDocumentId);
+        if (foundDoc) {
+          setDocument(foundDoc);
+        } else {
+          setError("Document not found in the proposal.");
+          setDocument(null);
+        }
       } else {
-        setError("Document not found.");
+        setError("Proposal not found.");
+        setProposal(null);
+        setDocument(null);
       }
-      if (fetchedProposal) {
-        setProposal(fetchedProposal);
+
+      if (fetchedAllProposalsResult.error) {
+        console.warn("Could not load all proposals for sidebar", fetchedAllProposalsResult.error);
+        setAllProposals([]);
       } else {
-        // This case might imply inconsistent data or proposal was deleted
-        if(!fetchedDoc) setError("Proposal and Document not found.");
-        else setError("Parent proposal not found.");
+        setAllProposals(fetchedAllProposalsResult.proposals || []);
       }
-      setAllProposals(fetchedAllProposals);
 
     } catch (e) {
       setError("Failed to load document details.");
@@ -63,36 +83,30 @@ export default function DocumentViewerPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [proposalId, documentId]);
+  }, [proposalIdStr, documentIdStr]);
 
   useEffect(() => {
     fetchDocumentDetails();
   }, [fetchDocumentDetails]);
   
-  // Mock effect to load signatures for the current page
   useEffect(() => {
-    if(document && proposal?.signatureAnalysisStatus === 'Completed') {
-      // Simulate fetching signatures for the current page
-      // This is highly dependent on how signature data is structured and stored
-      const mockSignatures: Signature[] = [
-        { id: `sig_${documentId}_${currentPage}_1`, documentId, pageNumber: currentPage, coordinates: {x:100,y:200,w:150,h:50}, confidence: 0.95 },
-        { id: `sig_${documentId}_${currentPage}_2`, documentId, pageNumber: currentPage, coordinates: {x:300,y:500,w:120,h:40}, confidence: 0.88 },
-      ].filter(sig => Math.random() > 0.5); // Randomly show some signatures
-      setSignaturesOnPage(mockSignatures);
+    if (document && proposal?.signatureAnalysisStatus?.toLowerCase() === 'completed') {
+      const currentPageData = document.pages.find(p => p.pageNumber === currentPageNumber);
+      setSignaturesOnPage(currentPageData?.signatures || []);
     } else {
       setSignaturesOnPage([]);
     }
-  }, [currentPage, document, proposal?.signatureAnalysisStatus, documentId]);
+  }, [currentPageNumber, document, proposal?.signatureAnalysisStatus]);
 
   const handlePageChange = (newPage: number) => {
     if (document && newPage >= 1 && newPage <= document.totalPages) {
-      setCurrentPage(newPage);
+      setCurrentPageNumber(newPage);
     }
   };
 
   if (isLoading) {
     return (
-      <AppShell>
+      <AppShell recentProposals={allProposals}>
         <PageHeader title={<Skeleton className="h-8 w-3/4" />} />
         <Skeleton className="h-[600px] w-full" />
       </AppShell>
@@ -101,11 +115,11 @@ export default function DocumentViewerPage() {
 
   if (error) {
     return (
-      <AppShell>
+      <AppShell recentProposals={allProposals}>
         <PageHeader title="Error" />
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error} <Button variant="link" onClick={() => router.push(`/proposals/${proposalId}`)}>Back to Proposal</Button></AlertDescription>
+          <AlertDescription>{error} <Button variant="link" onClick={() => router.push(`/proposals/${proposalIdStr}`)}>Back to Proposal</Button></AlertDescription>
         </Alert>
       </AppShell>
     );
@@ -113,7 +127,7 @@ export default function DocumentViewerPage() {
 
   if (!document || !proposal) {
     return (
-      <AppShell>
+      <AppShell recentProposals={allProposals}>
         <PageHeader title="Not Found" />
          <Alert>
           <AlertTitle>Not Found</AlertTitle>
@@ -126,12 +140,12 @@ export default function DocumentViewerPage() {
   return (
     <AppShell recentProposals={allProposals}>
       <Button variant="outline" size="sm" asChild className="mb-4">
-        <Link href={`/proposals/${proposalId}`}>
+        <Link href={`/proposals/${proposal.id}`}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Proposal: {proposal.name}
         </Link>
       </Button>
-      <PageHeader title={document.name} description={`Viewing page ${currentPage} of ${document.totalPages}`} />
+      <PageHeader title={document.name} description={`Viewing page ${currentPageNumber} of ${document.totalPages}`} />
 
       <Tabs defaultValue="pdf-view" className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
@@ -142,23 +156,23 @@ export default function DocumentViewerPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <PdfViewer
-                proposalId={proposalId}
-                documentId={documentId}
+                proposalId={proposal.id}
+                documentId={document.id}
                 totalPages={document.totalPages}
-                currentPage={currentPage}
+                currentPage={currentPageNumber}
                 onPageChange={handlePageChange}
               />
             </div>
             <div className="lg:col-span-1">
-              <SignatureViewer proposalId={proposalId} signatures={signaturesOnPage} />
+              <SignatureViewer proposalId={proposal.id} signatures={signaturesOnPage} />
             </div>
           </div>
         </TabsContent>
         <TabsContent value="html-preview" className="mt-4">
             <HtmlPreview 
-                proposalId={proposalId} 
-                documentId={documentId} 
-                currentPage={currentPage} 
+                proposalId={proposal.id} 
+                documentId={document.id} 
+                currentPage={currentPageNumber} 
             />
         </TabsContent>
       </Tabs>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useTransition } from 'react';
@@ -12,8 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getProposalById, getProposals } from '@/lib/mockData';
-import { startSignatureAnalysisAction } from '@/lib/actions';
+import { getProposalByIdAction, getProposalsAction, startSignatureAnalysisAction } from '@/lib/actions';
 import type { Proposal, Document } from '@/types';
 import { ArrowLeft, FileText, BarChart, CheckCircle, Clock, AlertCircle, RefreshCw, FileSearch } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -32,20 +32,38 @@ export default function ProposalDetailPage() {
 
   const fetchProposalDetails = useCallback(async () => {
     if (!proposalId) return;
+    // Ensure proposalId is a number for API call
+    const numericProposalId = parseInt(proposalId, 10);
+    if (isNaN(numericProposalId)) {
+        setError("Invalid Proposal ID format.");
+        setIsLoading(false);
+        return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
-      const [fetchedProposal, fetchedAllProposals] = await Promise.all([
-        getProposalById(proposalId),
-        getProposals() // For sidebar recent proposals
+      const [fetchedProposalResult, fetchedAllProposalsResult] = await Promise.all([
+        getProposalByIdAction(numericProposalId),
+        getProposalsAction()
       ]);
 
-      if (fetchedProposal) {
-        setProposal(fetchedProposal);
+      if (fetchedProposalResult.error) {
+        setError(fetchedProposalResult.error);
+        setProposal(null);
       } else {
-        setError("Proposal not found.");
+        setProposal(fetchedProposalResult.proposal || null);
+         if (!fetchedProposalResult.proposal) setError("Proposal not found.");
       }
-      setAllProposals(fetchedAllProposals);
+
+      if (fetchedAllProposalsResult.error) {
+        // Non-critical error, dashboard sidebar might be empty
+        console.warn("Failed to load all proposals for sidebar:", fetchedAllProposalsResult.error);
+        setAllProposals([]);
+      } else {
+        setAllProposals(fetchedAllProposalsResult.proposals || []);
+      }
+
     } catch (e) {
       setError("Failed to load proposal details.");
       console.error(e);
@@ -59,7 +77,8 @@ export default function ProposalDetailPage() {
   }, [fetchProposalDetails]);
 
   const handleUploadComplete = (newDocument: Document) => {
-    setProposal(prev => prev ? { ...prev, documents: [...prev.documents, newDocument] } : null);
+    // Refetch proposal to include the new document from the backend's perspective
+    fetchProposalDetails();
   };
 
   const handleStartAnalysis = () => {
@@ -69,24 +88,26 @@ export default function ProposalDetailPage() {
       if (result.error) {
         toast({ title: "Analysis Error", description: result.error, variant: "destructive" });
       } else {
-        toast({ title: "Analysis Started", description: "Signature analysis is in progress." });
+        toast({ title: "Analysis Started", description: result.message || "Signature analysis is in progress." });
       }
-      // Refetch to get updated status
-      fetchProposalDetails();
+      // Refetch to get updated status from backend
+      // Add a small delay to give backend time to update status potentially
+      setTimeout(fetchProposalDetails, 1000); 
     });
   };
   
   const SignatureStatusIndicator = () => {
-    if (!proposal) return null;
-    switch (proposal.signatureAnalysisStatus) {
-      case 'Completed':
+    if (!proposal || !proposal.signatureAnalysisStatus) return <Badge variant="outline">Not Started</Badge>;
+    switch (proposal.signatureAnalysisStatus.toLowerCase()) { // API might return different casing
+      case 'completed':
         return <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="mr-1 h-3 w-3" />Completed</Badge>;
-      case 'In Progress':
+      case 'in progress':
+      case 'inprogress': // common variations
         return <Badge variant="secondary"><Clock className="mr-1 h-3 w-3 animate-spin" />In Progress</Badge>;
-      case 'Failed':
+      case 'failed':
         return <Badge variant="destructive"><AlertCircle className="mr-1 h-3 w-3" />Failed</Badge>;
       default:
-        return <Badge variant="outline">Not Started</Badge>;
+        return <Badge variant="outline">{proposal.signatureAnalysisStatus}</Badge>;
     }
   };
 
@@ -115,7 +136,7 @@ export default function ProposalDetailPage() {
   }
 
   if (!proposal) {
-    return ( // Should be covered by error state, but as a fallback
+    return (
       <AppShell>
         <PageHeader title="Proposal Not Found" />
          <Alert>
@@ -125,6 +146,9 @@ export default function ProposalDetailPage() {
       </AppShell>
     );
   }
+  
+  const analysisInProgress = proposal.signatureAnalysisStatus?.toLowerCase() === 'in progress' || proposal.signatureAnalysisStatus?.toLowerCase() === 'inprogress';
+
 
   return (
     <AppShell recentProposals={allProposals}>
@@ -134,7 +158,7 @@ export default function ProposalDetailPage() {
       </Button>
       <PageHeader
         title={proposal.name}
-        description={`Application No: ${proposal.applicationNumber} | Created: ${new Date(proposal.createdAt).toLocaleDateString()}`}
+        description={`Application No: ${proposal.applicationNumber || 'N/A'} | Created: ${new Date(proposal.createdAt).toLocaleDateString()}`}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -147,7 +171,7 @@ export default function ProposalDetailPage() {
             <CardContent>
               <DocumentUpload proposalId={proposal.id} onUploadComplete={handleUploadComplete} />
               <div className="mt-6 space-y-3">
-                {proposal.documents.length > 0 ? (
+                {proposal.documents && proposal.documents.length > 0 ? (
                   proposal.documents.map(doc => (
                     <DocumentListItem key={doc.id} proposalId={proposal.id} document={doc} />
                   ))
@@ -169,14 +193,14 @@ export default function ProposalDetailPage() {
                 <p className="text-sm font-medium">Status:</p>
                 <SignatureStatusIndicator />
               </div>
-              {proposal.signatureAnalysisStatus === 'Completed' && proposal.signatureAnalysisSummary && (
+              {proposal.signatureAnalysisStatus?.toLowerCase() === 'completed' && proposal.signatureAnalysisReportHtml && (
                  <Alert className="mb-3">
                   <CheckCircle className="h-4 w-4" />
-                  <AlertTitle>Analysis Summary</AlertTitle>
-                  <AlertDescription className="text-xs">{proposal.signatureAnalysisSummary}</AlertDescription>
+                  <AlertTitle>Analysis Complete</AlertTitle>
+                  <AlertDescription className="text-xs">Report is available.</AlertDescription>
                 </Alert>
               )}
-              {proposal.signatureAnalysisStatus === 'Failed' && (
+              {proposal.signatureAnalysisStatus?.toLowerCase() === 'failed' && (
                  <Alert variant="destructive" className="mb-3">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Analysis Failed</AlertTitle>
@@ -187,17 +211,17 @@ export default function ProposalDetailPage() {
             <CardFooter className="flex-col items-stretch space-y-2">
               <Button
                 onClick={handleStartAnalysis}
-                disabled={isAnalyzing || proposal.signatureAnalysisStatus === 'In Progress' || proposal.documents.length === 0}
+                disabled={isAnalyzing || analysisInProgress || !proposal.documents || proposal.documents.length === 0}
                 className="w-full"
               >
-                {isAnalyzing || proposal.signatureAnalysisStatus === 'In Progress' ? (
+                {isAnalyzing || analysisInProgress ? (
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <FileSearch className="mr-2 h-4 w-4" />
                 )}
                 {proposal.signatureAnalysisStatus === 'Completed' || proposal.signatureAnalysisStatus === 'Failed' ? 'Re-analyze Signatures' : 'Start Signature Analysis'}
               </Button>
-              {proposal.signatureAnalysisStatus === 'Completed' && (
+              {proposal.signatureAnalysisStatus?.toLowerCase() === 'completed' && (
                 <Button variant="outline" className="w-full" asChild>
                   <Link href={`/proposals/${proposal.id}/signature-analysis/report`}>
                     View Analysis Report

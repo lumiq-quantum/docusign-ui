@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -5,11 +6,11 @@ import Image from 'next/image';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { getDocumentPagePdfUrlAction } from '@/lib/actions'; // Using action to get URL
+import { getDocumentPagePdfUrlAction } from '@/lib/actions';
 
 interface PdfViewerProps {
-  proposalId: string;
-  documentId: string;
+  proposalId: number;
+  documentId: number;
   totalPages: number;
   currentPage: number;
   onPageChange: (newPage: number) => void;
@@ -30,6 +31,7 @@ export function PdfViewer({ proposalId, documentId, totalPages, currentPage, onP
         setError(result.error || "Failed to load page image.");
         setPageImageUrl(null);
       } else {
+        // The action now returns the full API endpoint URL for the image
         setPageImageUrl(result.url);
       }
     } catch (e) {
@@ -98,12 +100,13 @@ export function PdfViewer({ proposalId, documentId, totalPages, currentPage, onP
           <Image
             src={pageImageUrl}
             alt={`Document Page ${currentPage}`}
-            width={800 * zoomLevel} // Base width, adjust as needed
-            height={1100 * zoomLevel} // Base height, adjust as needed
+            width={800} // Intrinsic width; zoom handled by style
+            height={1100} // Intrinsic height
             className="shadow-lg border"
-            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center' }}
+            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center center', width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: `calc(100vh - 200px)` }}
             data-ai-hint="document page"
-            priority={true} // Load current page image with priority
+            priority={true}
+            unoptimized={true} // If API serves raw image, next/image might not optimize it unless domain is configured
           />
         )}
          {!isLoading && !error && !pageImageUrl && (

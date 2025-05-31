@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useTransition, useRef } from 'react';
@@ -11,7 +12,7 @@ import type { Document } from '@/types';
 import { addDocumentToProposalAction } from '@/lib/actions';
 
 interface DocumentUploadProps {
-  proposalId: string;
+  proposalId: number; // Changed from string
   onUploadComplete: (newDocument: Document) => void;
 }
 
@@ -38,7 +39,7 @@ export function DocumentUpload({ proposalId, onUploadComplete }: DocumentUploadP
           variant: "destructive",
         });
         if (fileInputRef.current) {
-            fileInputRef.current.value = ""; // Reset file input
+            fileInputRef.current.value = ""; 
         }
         return;
       }
@@ -49,7 +50,6 @@ export function DocumentUpload({ proposalId, onUploadComplete }: DocumentUploadP
   const handleUpload = (file: File) => {
     setUploadProgress({ fileName: file.name, progress: 0, status: 'uploading' });
 
-    // Simulate progress for UI feedback
     let currentProgress = 0;
     const interval = setInterval(() => {
       currentProgress += 10;
@@ -63,7 +63,7 @@ export function DocumentUpload({ proposalId, onUploadComplete }: DocumentUploadP
     startTransition(async () => {
       try {
         const result = await addDocumentToProposalAction(proposalId, file);
-        clearInterval(interval); // Clear simulation interval
+        clearInterval(interval); 
 
         if (result.error || !result.document) {
           setUploadProgress(prev => prev ? { ...prev, status: 'error', error: result.error || "Upload failed." } : null);
@@ -79,11 +79,10 @@ export function DocumentUpload({ proposalId, onUploadComplete }: DocumentUploadP
             description: `${file.name} has been uploaded.`,
           });
           onUploadComplete(result.document);
-          // Reset after a delay
           setTimeout(() => {
             setUploadProgress(null);
             if (fileInputRef.current) {
-              fileInputRef.current.value = ""; // Reset file input
+              fileInputRef.current.value = ""; 
             }
           }, 3000);
         }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useTransition } from 'react';
@@ -33,14 +34,15 @@ export function CreateProposalDialog({ onProposalCreated }: { onProposalCreated:
     startTransition(async () => {
       const result = await createProposalAction(formData);
       if (result.error) {
-        // Handle Zod errors specifically if they are structured that way
-        if (typeof result.error === 'object' && result.error.name) {
-             toast({ title: "Error", description: result.error.name.join(', '), variant: "destructive" });
-        } else if (typeof result.error === 'string') {
-             toast({ title: "Error", description: result.error, variant: "destructive" });
-        } else {
-            toast({ title: "Error", description: "An unknown error occurred.", variant: "destructive" });
+        let errorMessage = "An unknown error occurred.";
+        if (typeof result.error === 'string') {
+            errorMessage = result.error;
+        } else if (typeof result.error === 'object' && result.error.name && Array.isArray(result.error.name)) {
+            errorMessage = result.error.name.join(', ');
+        } else if (typeof result.error === 'object' && result.error.detail) {
+             errorMessage = String(result.error.detail);
         }
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
       } else if (result.proposal) {
         toast({ title: "Success", description: `Proposal "${result.proposal.name}" created.` });
         setIsOpen(false);

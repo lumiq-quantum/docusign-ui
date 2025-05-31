@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,12 +11,14 @@ interface ProposalCardProps {
 }
 
 const StatusIcon = ({ status }: { status: Proposal['signatureAnalysisStatus'] }) => {
-  switch (status) {
-    case 'Completed':
+  if (!status) return <Clock className="h-4 w-4 text-muted-foreground" />;
+  switch (status.toLowerCase()) {
+    case 'completed':
       return <CheckCircle className="h-4 w-4 text-green-500" />;
-    case 'In Progress':
+    case 'in progress':
+    case 'inprogress':
       return <Clock className="h-4 w-4 text-blue-500 animate-spin" />;
-    case 'Failed':
+    case 'failed':
       return <AlertCircle className="h-4 w-4 text-red-500" />;
     default:
       return <Clock className="h-4 w-4 text-muted-foreground" />;
@@ -24,29 +27,30 @@ const StatusIcon = ({ status }: { status: Proposal['signatureAnalysisStatus'] })
 
 export function ProposalCard({ proposal }: ProposalCardProps) {
   const formattedDate = new Date(proposal.createdAt).toLocaleDateString();
+  const signatureStatus = proposal.signatureAnalysisStatus || 'Not Started';
 
   return (
     <Card className="flex flex-col h-full">
       <CardHeader>
         <CardTitle className="font-headline text-lg">{proposal.name}</CardTitle>
         <CardDescription>
-          App No: {proposal.applicationNumber} | Created: {formattedDate}
+          App No: {proposal.applicationNumber || 'N/A'} | Created: {formattedDate}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
         <div className="flex items-center text-sm text-muted-foreground mb-2">
           <FileText className="mr-2 h-4 w-4" />
-          <span>{proposal.documents.length} document{proposal.documents.length !== 1 ? 's' : ''}</span>
+          <span>{proposal.documents?.length || 0} document{proposal.documents?.length !== 1 ? 's' : ''}</span>
         </div>
         <div className="flex items-center text-sm">
-          <StatusIcon status={proposal.signatureAnalysisStatus} />
+          <StatusIcon status={signatureStatus} />
           <span className="ml-2">Signature Analysis:</span>
           <Badge variant={
-            proposal.signatureAnalysisStatus === 'Completed' ? 'default' : 
-            proposal.signatureAnalysisStatus === 'In Progress' ? 'secondary' :
-            proposal.signatureAnalysisStatus === 'Failed' ? 'destructive' : 'outline'
+            signatureStatus.toLowerCase() === 'completed' ? 'default' : 
+            signatureStatus.toLowerCase() === 'in progress' || signatureStatus.toLowerCase() === 'inprogress' ? 'secondary' :
+            signatureStatus.toLowerCase() === 'failed' ? 'destructive' : 'outline'
           } className="ml-2 text-xs">
-            {proposal.signatureAnalysisStatus || 'Not Started'}
+            {signatureStatus}
           </Badge>
         </div>
       </CardContent>

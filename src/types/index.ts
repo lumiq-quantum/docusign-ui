@@ -1,40 +1,90 @@
+
+// Maps to ProjectResponse in OpenAPI
 export interface Proposal {
-  id: string;
-  applicationNumber: string;
+  id: number;
+  applicationNumber: string | null;
   name: string;
-  createdAt: string; // ISO date string
-  documents: Document[];
-  signatureAnalysisStatus?: 'Not Started' | 'In Progress' | 'Completed' | 'Failed';
-  signatureAnalysisSummary?: string;
-  signatureAnalysisReportHtml?: string;
+  createdAt: string; // ISO date string from created_at
+  documents: Document[]; // from documents in ProjectResponse
+  signatureAnalysisStatus: string | null; // from signature_analysis_status
+  signatureAnalysisReportHtml?: string | null; // from signature_analysis_report_html
+  // chat_session_id from API is not currently used in UI.
 }
 
+// Maps to DocumentResponse in OpenAPI
 export interface Document {
-  id: string;
-  name: string;
-  uploadedAt: string; // ISO date string
-  totalPages: number;
-  type: 'pdf'; // Assuming only PDFs for now
-  size: number; // in bytes
-  extractedHtml?: Record<number, string>; // pageNumber: htmlContent
+  id: number;
+  name: string; // from file_name
+  uploadedAt: string; // ISO date string from created_at
+  totalPages: number; // from total_pages
+  projectId: number; // from project_id
+  pages: Page[]; // from pages in DocumentResponse
 }
 
+// Maps to PageResponse in OpenAPI
+export interface Page {
+  id: number;
+  pageNumber: number; // from page_number
+  htmlContent?: string | null; // from generated_form_html
+  textContent?: string | null; // from text_content
+  signatures: Signature[]; // from signatures in PageResponse
+  documentId: number; // from document_id
+}
+
+// Maps to SignatureInstanceResponse in OpenAPI
 export interface Signature {
-  id: string; // signature_instance_id
-  documentId: string;
-  pageNumber: number;
-  // Placeholder for coordinates, actual structure might depend on Textract output
-  coordinates: { x: number; y: number; width: number; height: number }; 
-  imageUrl?: string; // URL to the cropped signature image
-  confidence?: number;
+  id: number;
+  pageId: number;
+  documentId: number; // Not directly on SignatureInstanceResponse, but useful context. Can be inferred.
+  stakeholderId?: number | null;
+  aiSignatureId?: string | null;
+  confidence?: number | null; // Parsed from ai_confidence (string|null)
+  // Assuming bounding_box_json is { x: number, y: number, width: number, height: number }
+  coordinates?: { x: number; y: number; width: number; height: number; } | null; // from bounding_box_json
+  // textract_response_json not directly used in UI for now.
+  isConsistentWithStakeholderGroup?: boolean | null;
+  isUniqueAmongStakeholders?: boolean | null;
+  analysisNotes?: string | null;
+  // imageUrl will be client-managed or fetched via its own action
+  imageUrl?: string;
 }
 
-// Represents a page of a document, could be PDF or HTML view
-export interface DocumentPage {
-  proposalId: string;
-  documentId: string;
-  pageNumber: number;
-  type: 'pdf' | 'html';
-  contentUrl?: string; // URL for PDF page image
-  htmlContent?: string; // Direct HTML content
+// For API responses that might not be full Proposal/Document objects initially
+export interface ApiProposal extends Omit<Proposal, 'documents'> {
+  documents: ApiDocument[];
+}
+
+export interface ApiDocument extends Omit<Document, 'pages'> {
+  file_name: string;
+  project_id: number;
+  created_at: string;
+  pages: ApiPage[];
+}
+
+export interface ApiPage extends Omit<Page, 'signatures' | 'htmlContent'> {
+  page_number: number;
+  document_id: number;
+  generated_form_html: string | null;
+  text_content: string | null;
+  signatures: ApiSignature[];
+}
+
+export interface ApiSignature {
+  id: number;
+  page_id: number;
+  document_id: number; // Part of API response for SignatureInstance
+  stakeholder_id?: number | null;
+  ai_signature_id?: string | null;
+  ai_confidence?: string | null; // API sends as string
+  bounding_box_json?: { x: number; y: number; width: number; height: number; } | Record<string, any> | null; // Flexible for now
+  textract_response_json?: Record<string, any> | null;
+  is_consistent_with_stakeholder_group?: boolean | null;
+  is_unique_among_stakeholders?: boolean | null;
+  analysis_notes?: string | null;
+}
+
+// For creating a proposal, maps to ProjectCreate
+export interface ProposalCreatePayload {
+  name: string;
+  chat_session_id?: string | null;
 }
