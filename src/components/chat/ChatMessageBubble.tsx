@@ -3,7 +3,7 @@
 
 import type { ChatMessage } from '@/types';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { User, Bot } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -13,7 +13,21 @@ interface ChatMessageBubbleProps {
 
 export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
   const isUser = message.role === 'user';
-  const timestamp = message.timestamp ? formatDistanceToNow(new Date(message.timestamp), { addSuffix: true }) : '';
+  
+  let dateToFormat: Date | null = null;
+  if (message.timestamp && typeof message.timestamp === 'string') {
+    // Check if the timestamp string already includes timezone information (Z or +/-HH:MM)
+    if (message.timestamp.endsWith('Z') || /[\+\-]\d{2}:\d{2}$/.test(message.timestamp) || /[\+\-]\d{2}\d{2}$/.test(message.timestamp)) {
+      dateToFormat = new Date(message.timestamp);
+    } else {
+      // If no timezone info, assume it's UTC and append 'Z'
+      dateToFormat = new Date(message.timestamp + 'Z');
+    }
+  }
+
+  const timestamp = dateToFormat
+    ? formatDistanceToNow(dateToFormat, { addSuffix: true })
+    : '';
 
   return (
     <div
@@ -56,6 +70,7 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
             "text-xs mt-1",
             isUser ? "text-primary-foreground/70 text-right" : "text-muted-foreground text-left"
           )}
+          title={dateToFormat ? dateToFormat.toLocaleString() : message.timestamp} // Show full date on hover
         >
           {timestamp}
         </p>
