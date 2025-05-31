@@ -5,7 +5,11 @@ import { z } from 'zod';
 import type { Proposal, Document, Signature, Page, ProposalCreatePayload, ApiProposal, ApiDocument, ApiPage, ApiSignature } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const API_NOT_CONFIGURED_ERROR = "API endpoint (NEXT_PUBLIC_API_BASE_URL) is not configured. Please check your .env file, ensure it's at the root of your project, and restart the Next.js development server.";
+
+// Log the detected API_BASE_URL when the module is loaded on the server
+console.log(`[actions.ts] SERVER_SIDE: NEXT_PUBLIC_API_BASE_URL detected as: "${API_BASE_URL}"`);
+
+const API_NOT_CONFIGURED_ERROR = `API endpoint (NEXT_PUBLIC_API_BASE_URL) is not configured or is an empty string. Detected value: "${API_BASE_URL}". Please ensure your .env file is at the root of your project with NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 (or your actual API URL) and restart the Next.js development server.`;
 
 // Helper to transform API proposal to client-side Proposal
 function transformApiProposal(apiProposal: ApiProposal): Proposal {
@@ -56,7 +60,7 @@ function transformApiSignature(apiSig: ApiSignature, documentId: number): Signat
   return {
     id: apiSig.id,
     pageId: apiSig.page_id,
-    documentId: documentId, // apiSig.document_id is available in SignatureInstanceResponse from API
+    documentId: documentId, 
     stakeholderId: apiSig.stakeholder_id,
     aiSignatureId: apiSig.ai_signature_id,
     confidence: parsedConfidence,
@@ -70,7 +74,7 @@ function transformApiSignature(apiSig: ApiSignature, documentId: number): Signat
 
 export async function getProposalsAction(): Promise<{ proposals?: Proposal[]; error?: string }> {
   if (!API_BASE_URL) {
-    console.error("getProposalsAction: API_BASE_URL not configured");
+    console.error(`getProposalsAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
     return { error: API_NOT_CONFIGURED_ERROR };
   }
   try {
@@ -82,13 +86,13 @@ export async function getProposalsAction(): Promise<{ proposals?: Proposal[]; er
     return { proposals: apiProposals.map(transformApiProposal) };
   } catch (error) {
     console.error("getProposalsAction error:", error);
-    return { error: `An unexpected error occurred while fetching proposals from ${API_BASE_URL}. Is the API server running?` };
+    return { error: `An unexpected error occurred while fetching proposals from ${API_BASE_URL}. Is the API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
 export async function getProposalByIdAction(proposalId: number): Promise<{ proposal?: Proposal; error?: string }> {
   if (!API_BASE_URL) {
-    console.error("getProposalByIdAction: API_BASE_URL not configured");
+    console.error(`getProposalByIdAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
     return { error: API_NOT_CONFIGURED_ERROR };
   }
   try {
@@ -101,19 +105,17 @@ export async function getProposalByIdAction(proposalId: number): Promise<{ propo
     return { proposal: transformApiProposal(apiProposal) };
   } catch (error) {
     console.error("getProposalByIdAction error:", error);
-    return { error: `An unexpected error occurred while fetching the proposal from ${API_BASE_URL}. Is the API server running?` };
+    return { error: `An unexpected error occurred while fetching the proposal from ${API_BASE_URL}. Is the API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
-
-// Schema for creating a proposal
 const CreateProposalFormSchema = z.object({
   name: z.string().min(3, { message: "Proposal name must be at least 3 characters." }),
 });
 
 export async function createProposalAction(formData: FormData) {
   if (!API_BASE_URL) {
-    console.error("createProposalAction: API_BASE_URL not configured");
+    console.error(`createProposalAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
     return { error: API_NOT_CONFIGURED_ERROR };
   }
   const validatedFields = CreateProposalFormSchema.safeParse({
@@ -143,13 +145,13 @@ export async function createProposalAction(formData: FormData) {
     return { proposal: transformApiProposal(newApiProposal) };
   } catch (error) {
     console.error("createProposalAction error:", error);
-    return { error: `Failed to create proposal due to a network or unexpected error from ${API_BASE_URL}. Is the API server running?` };
+    return { error: `Failed to create proposal due to a network or unexpected error from ${API_BASE_URL}. Is the API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
 export async function addDocumentToProposalAction(proposalId: number, file: File): Promise<{ document?: Document; error?: string }> {
   if (!API_BASE_URL) {
-    console.error("addDocumentToProposalAction: API_BASE_URL not configured");
+    console.error(`addDocumentToProposalAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
     return { error: API_NOT_CONFIGURED_ERROR };
   }
   if (!proposalId) return { error: "Proposal ID is required." };
@@ -161,14 +163,14 @@ export async function addDocumentToProposalAction(proposalId: number, file: File
   try {
     const response = await fetch(`${API_BASE_URL}/proposals/${proposalId}/documents/`, {
       method: 'POST',
-      body: formData, // Content-Type will be set automatically by browser for FormData
+      body: formData, 
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ detail: response.statusText }));
       return { error: errorData.detail || `Failed to upload document: HTTP ${response.status} from ${API_BASE_URL}/proposals/${proposalId}/documents/` };
     }
-    // API returns an array of DocumentResponse, we assume one file upload at a time here.
+    
     const apiDocuments: ApiDocument[] = await response.json();
     if (apiDocuments.length > 0) {
       return { document: transformApiDocument(apiDocuments[0]) };
@@ -176,14 +178,14 @@ export async function addDocumentToProposalAction(proposalId: number, file: File
     return { error: "No document data returned from API." };
   } catch (error) {
     console.error("addDocumentToProposalAction error:", error);
-    return { error: `An unexpected error occurred while adding the document via ${API_BASE_URL}. Is the API server running?` };
+    return { error: `An unexpected error occurred while adding the document via ${API_BASE_URL}. Is the API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
 
 export async function startSignatureAnalysisAction(proposalId: number): Promise<{ message?: string; error?: string }> {
   if (!API_BASE_URL) {
-    console.error("startSignatureAnalysisAction: API_BASE_URL not configured");
+    console.error(`startSignatureAnalysisAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
     return { error: API_NOT_CONFIGURED_ERROR };
   }
   if (!proposalId) return { error: "Proposal ID is required." };
@@ -196,42 +198,28 @@ export async function startSignatureAnalysisAction(proposalId: number): Promise<
       const errorData = await response.json().catch(() => ({ detail: response.statusText }));
       return { error: errorData.detail || `Failed to start signature analysis: HTTP ${response.status} from ${API_BASE_URL}/proposals/${proposalId}/signature-analysis/start` };
     }
-    // The API returns {"additionalProperties": {"type": "string"}}, let's assume a message.
+    
     const result: { message?: string, detail?: any } = await response.json();
     return { message: result.message || "Signature analysis started." };
   } catch (e) {
     console.error("startSignatureAnalysisAction error:", e);
-    return { error: `Signature analysis failed to start due to an unexpected error from ${API_BASE_URL}. Is the API server running?` };
+    return { error: `Signature analysis failed to start due to an unexpected error from ${API_BASE_URL}. Is the API server running? Details: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
 export async function extractHtmlAction(proposalId: number, documentId: number, pageNumber: number): Promise<{ message?: string; error?: string }> {
   if (!API_BASE_URL) {
-    console.error("extractHtmlAction: API_BASE_URL not configured");
+    console.error(`extractHtmlAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
     return { error: API_NOT_CONFIGURED_ERROR };
   }
-  if (!proposalId || !documentId || pageNumber === undefined) return { error: "Missing parameters." };
+  if (!proposalId || !documentId || pageNumber === undefined) return { error: "Missing parameters for HTML extraction." };
   
   try {
-    // According to OpenAPI, this endpoint does not take a request body for page_number.
-    // If the API requires a page number in the body, the OpenAPI spec needs an update.
-    // For now, assuming it's part of the path or the API handles specific pages internally if not specified.
-    // If page_number is for the *entire* document's HTML and this endpoint triggers it for all pages,
-    // then the current implementation is fine. If it's page-specific for *triggering* extraction,
-    // the API endpoint design might need review if it doesn't accept page_number in path/query for POST.
-    // The original prompt to use AI to extract implies the AI needs context of *which* page.
-    // Let's assume for now the API handles this based on the `documentId` and this triggers for the whole doc
-    // or the backend has a way to know which page if it's specific.
-    // The Genkit flow `extractHtmlFromDocument` in the original code *did* take a specific page URI.
-    // However, this API endpoint does not take a page_number in the path.
-    // Let's assume the API endpoint might need updating or it processes all pages.
-    // Based on the current OpenAPI, there's no body, so sending one would be incorrect.
     const response = await fetch(`${API_BASE_URL}/proposals/${proposalId}/documents/${documentId}/extract-html`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Removed body: JSON.stringify({ page_number: pageNumber }) as per OpenAPI (no requestBody)
-      // If the API *does* expect a body with page_number, the OpenAPI spec is incorrect.
-      // For now, adhering to the provided spec.
+      // As per OpenAPI spec, this endpoint does not have a request body.
+      // If pageNumber needs to be sent, the API endpoint or spec needs to be updated.
     });
 
     if (!response.ok) {
@@ -242,13 +230,14 @@ export async function extractHtmlAction(proposalId: number, documentId: number, 
     return { message: result.message || "HTML extraction process started." };
   } catch (e) {
     console.error("extractHtmlAction error:", e);
-    return { error: `Failed to extract HTML due to an unexpected error from ${API_BASE_URL}. Is the API server running?` };
+    return { error: `Failed to extract HTML due to an unexpected error from ${API_BASE_URL}. Is the API server running? Details: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
 
 export async function getSignatureImageUrlAction(proposalId: number, signatureInstanceId: number): Promise<{ imageUrl?: string; error?: string }> {
   if (!API_BASE_URL) {
-    console.error("getSignatureImageUrlAction: API_BASE_URL not configured");
+     // This action constructs a URL, so if API_BASE_URL is missing, the URL will be malformed.
+    console.error(`getSignatureImageUrlAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
     return { error: API_NOT_CONFIGURED_ERROR };
   }
   try {
@@ -256,13 +245,14 @@ export async function getSignatureImageUrlAction(proposalId: number, signatureIn
     return { imageUrl };
   } catch (error) {
     console.error("getSignatureImageUrlAction error:", error);
-    return { error: `An unexpected error occurred constructing signature image URL for ${API_BASE_URL}.` };
+    return { error: `An unexpected error occurred constructing signature image URL. Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
 export async function getDocumentPagePdfUrlAction(proposalId: number, documentId: number, pageNumber: number): Promise<{ url?: string; error?: string }> {
   if (!API_BASE_URL) {
-    console.error("getDocumentPagePdfUrlAction: API_BASE_URL not configured");
+    // This action constructs a URL.
+    console.error(`getDocumentPagePdfUrlAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
     return { error: API_NOT_CONFIGURED_ERROR };
   }
    try {
@@ -270,13 +260,13 @@ export async function getDocumentPagePdfUrlAction(proposalId: number, documentId
     return { url: pdfUrl };
   } catch (error) {
     console.error("getDocumentPagePdfUrlAction error:", error);
-    return { error: `An unexpected error occurred while constructing PDF page URL for ${API_BASE_URL}.` };
+    return { error: `An unexpected error occurred while constructing PDF page URL. Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
 export async function getDocumentPageHtmlAction(proposalId: number, documentId: number, pageNumber: number): Promise<{ html?: string; error?: string }> {
   if (!API_BASE_URL) {
-    console.error("getDocumentPageHtmlAction: API_BASE_URL not configured");
+    console.error(`getDocumentPageHtmlAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
     return { error: API_NOT_CONFIGURED_ERROR };
   }
   try {
@@ -285,19 +275,19 @@ export async function getDocumentPageHtmlAction(proposalId: number, documentId: 
        if (response.status === 404) return { html: "<p>HTML content not available for this page.</p>" }; 
        return { error: `Failed to fetch HTML content: ${response.statusText} (Status: ${response.status}) from ${API_BASE_URL}/proposals/${proposalId}/documents/${documentId}/pages/${pageNumber}/html` };
     }
-    // API spec for this endpoint returns GeneratedHtmlResponse { html_content: string }
+    
     const data: { html_content: string } = await response.json(); 
     return { html: data.html_content || "<p>No HTML content available for this page.</p>" };
   } catch (error) {
     console.error("getDocumentPageHtmlAction error:", error);
-    return { error: `An unexpected error occurred fetching HTML content from ${API_BASE_URL}. Is the API server running?` };
+    return { error: `An unexpected error occurred fetching HTML content from ${API_BASE_URL}. Is the API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
 
 export async function getSignatureAnalysisReportAction(proposalId: number): Promise<{ reportHtml?: string; error?: string }> {
   if (!API_BASE_URL) {
-    console.error("getSignatureAnalysisReportAction: API_BASE_URL not configured");
+    console.error(`getSignatureAnalysisReportAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
     return { error: API_NOT_CONFIGURED_ERROR };
   }
  try {
@@ -306,10 +296,35 @@ export async function getSignatureAnalysisReportAction(proposalId: number): Prom
       if (response.status === 404) return { error: "Report not found or analysis not complete."};
       return { error: `Failed to fetch signature analysis report: ${response.statusText} (Status: ${response.status}) from ${API_BASE_URL}/proposals/${proposalId}/signature-analysis/report` };
     }
-    const reportHtml = await response.text(); // Expecting text/html
+    const reportHtml = await response.text(); 
     return { reportHtml: reportHtml || "<p>Report content is not available.</p>" };
   } catch (error) {
     console.error("getSignatureAnalysisReportAction error:", error);
-    return { error: `An unexpected error occurred fetching the signature analysis report from ${API_BASE_URL}. Is the API server running?` };
+    return { error: `An unexpected error occurred fetching the signature analysis report from ${API_BASE_URL}. Is the API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+// Action to delete a proposal
+export async function deleteProposalAction(proposalId: number): Promise<{ success?: boolean; error?: string }> {
+  if (!API_BASE_URL) {
+    console.error(`deleteProposalAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
+    return { error: API_NOT_CONFIGURED_ERROR };
+  }
+  try {
+    const response = await fetch(`${API_BASE_URL}/proposals/${proposalId}/`, {
+      method: 'DELETE',
+    });
+    if (response.status === 204) { // No Content
+      return { success: true };
+    }
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+      return { error: errorData.detail || `Failed to delete proposal: HTTP ${response.status} from ${API_BASE_URL}/proposals/${proposalId}/` };
+    }
+    // Should ideally be 204, but if API returns 200 with some body:
+    return { success: true }; 
+  } catch (error) {
+    console.error("deleteProposalAction error:", error);
+    return { error: `An unexpected error occurred while deleting the proposal from ${API_BASE_URL}. Is the API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
