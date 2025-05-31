@@ -11,9 +11,39 @@ import { HtmlPreview } from '@/components/documents/HtmlPreview';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { getProposalByIdAction, getProposalsAction } from '@/lib/actions';
 import type { Document, Proposal } from '@/types';
 import { ArrowLeft } from 'lucide-react';
+
+const PageNavigationSidebar = ({ totalPages, currentPage, onPageChange }: {
+  totalPages: number;
+  currentPage: number;
+  onPageChange: (page: number) => void;
+}) => {
+  if (totalPages <= 0) return null;
+
+  return (
+    <div className="w-48 flex-shrink-0 border-r pr-2">
+      <h3 className="text-base font-semibold mb-2 px-2 text-muted-foreground">Document Pages</h3>
+      <ScrollArea className="h-[calc(100vh-16rem)]"> {/* Adjusted height */}
+        <div className="flex flex-col space-y-1 pr-2">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
+            <Button
+              key={pageNumber}
+              variant={currentPage === pageNumber ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => onPageChange(pageNumber)}
+              className="w-full justify-start text-left h-8"
+            >
+              Page {pageNumber}
+            </Button>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+};
 
 export default function DocumentViewerPage() {
   const params = useParams();
@@ -45,7 +75,7 @@ export default function DocumentViewerPage() {
     try {
       const [fetchedProposalResult, fetchedAllProposalsResult] = await Promise.all([
         getProposalByIdAction(numericProposalId),
-        getProposalsAction() 
+        getProposalsAction()
       ]);
 
       if (fetchedProposalResult.error) {
@@ -57,6 +87,12 @@ export default function DocumentViewerPage() {
         const foundDoc = fetchedProposalResult.proposal.documents.find(d => d.id === numericDocumentId);
         if (foundDoc) {
           setDocument(foundDoc);
+          // Ensure currentPageNumber is valid for the new document
+          if (foundDoc.totalPages > 0 && currentPageNumber > foundDoc.totalPages) {
+            setCurrentPageNumber(1);
+          } else if (foundDoc.totalPages === 0) {
+            setCurrentPageNumber(1); // Or handle no pages case
+          }
         } else {
           setError("Document not found in the proposal.");
           setDocument(null);
@@ -80,14 +116,17 @@ export default function DocumentViewerPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [proposalIdStr, documentIdStr]);
+  }, [proposalIdStr, documentIdStr, currentPageNumber]); // Added currentPageNumber to ensure reset if needed
 
   useEffect(() => {
     fetchDocumentDetails();
   }, [fetchDocumentDetails]);
-  
+
   const handlePageChange = (newPage: number) => {
     if (document && newPage >= 1 && newPage <= document.totalPages) {
+      setCurrentPageNumber(newPage);
+    } else if (document && document.totalPages === 0 && newPage === 1) {
+      // Allows setting to 1 if totalPages is 0, though UI might not show pages
       setCurrentPageNumber(newPage);
     }
   };
@@ -96,9 +135,17 @@ export default function DocumentViewerPage() {
     return (
       <AppShell recentProposals={allProposals}>
         <PageHeader title={<Skeleton className="h-8 w-3/4" />} description={<Skeleton className="h-4 w-1/2 mt-1" />} />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Skeleton className="h-[600px] w-full" />
-          <Skeleton className="h-[600px] w-full" />
+        <div className="flex flex-row mt-2">
+          <div className="w-48 flex-shrink-0 border-r pr-2">
+            <Skeleton className="h-6 w-3/4 mb-3 px-2" />
+            <div className="space-y-1 pr-2">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+            </div>
+          </div>
+          <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
+            <Skeleton className="h-[600px] w-full" />
+            <Skeleton className="h-[600px] w-full" />
+          </div>
         </div>
       </AppShell>
     );
@@ -136,26 +183,44 @@ export default function DocumentViewerPage() {
           Back to Proposal: {proposal.name}
         </Link>
       </Button>
-      <PageHeader title={document.name} description={`Viewing page ${currentPageNumber} of ${document.totalPages}`} />
+      <PageHeader title={document.name} description={`Viewing page ${currentPageNumber} of ${document.totalPages > 0 ? document.totalPages : 'N/A' }`} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <PdfViewer
-            proposalId={proposal.id}
-            documentId={document.id}
+      <div className="flex flex-1 mt-2">
+        {document.totalPages > 0 && (
+          <PageNavigationSidebar
             totalPages={document.totalPages}
             currentPage={currentPageNumber}
             onPageChange={handlePageChange}
           />
-        </div>
-        <div>
-          <HtmlPreview 
-            proposalId={proposal.id} 
-            documentId={document.id} 
-            currentPage={currentPageNumber} 
-          />
+        )}
+        <div className={`flex-grow grid grid-cols-1 ${document.totalPages > 0 ? 'md:grid-cols-2 pl-6' : 'md:grid-cols-1'} gap-6`}>
+          {document.totalPages > 0 ? (
+            <>
+              <div>
+                <PdfViewer
+                  proposalId={proposal.id}
+                  documentId={document.id}
+                  totalPages={document.totalPages}
+                  currentPage={currentPageNumber}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+              <div>
+                <HtmlPreview
+                  proposalId={proposal.id}
+                  documentId={document.id}
+                  currentPage={currentPageNumber}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="col-span-full text-center py-10 text-muted-foreground">
+              This document has no pages to display.
+            </div>
+          )}
         </div>
       </div>
     </AppShell>
   );
 }
+
