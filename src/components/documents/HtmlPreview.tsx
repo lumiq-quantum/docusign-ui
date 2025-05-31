@@ -18,11 +18,11 @@ interface HtmlPreviewProps {
 
 export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreviewProps) {
   const [htmlViewUrl, setHtmlViewUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // For loading the iframe URL
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isExtracting, setIsExtracting] = useState(false); // For triggering extraction
+  const [isExtracting, setIsExtracting] = useState(false);
   const { toast } = useToast();
-  const [iframeKey, setIframeKey] = useState(Date.now()); // To force iframe reload
+  const [iframeKey, setIframeKey] = useState(Date.now());
 
   const prepareHtmlViewUrl = useCallback(() => {
     setIsLoading(true);
@@ -33,9 +33,8 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
       setHtmlViewUrl(null);
     } else {
       setHtmlViewUrl(result.url);
-      setIframeKey(Date.now()); // Change key to force iframe reload
+      setIframeKey(Date.now()); 
     }
-    // Simulate iframe loading, actual loading is handled by the browser
     setTimeout(() => setIsLoading(false), 500); 
   }, [proposalId, documentId, currentPage]);
 
@@ -45,7 +44,7 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
 
   const handleExtractHtml = async () => {
     setIsExtracting(true);
-    setError(null); // Clear previous errors
+    setError(null);
     try {
       const result = await extractHtmlAction(proposalId, documentId, currentPage); 
       if (result.error) {
@@ -53,7 +52,6 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
         toast({ title: "Extraction Failed", description: result.error, variant: "destructive" });
       } else {
         toast({ title: "Extraction Triggered", description: result.message || "HTML extraction process has been started. Content will refresh shortly." });
-        // Re-prepare the URL and refresh iframe after a delay
         setTimeout(() => {
           prepareHtmlViewUrl();
         }, 5000); 
@@ -67,7 +65,7 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
   };
 
   return (
-    <Card>
+    <Card className="h-full flex flex-col"> {/* Added h-full and flex flex-col */}
       <CardHeader>
         <div className="flex justify-between items-center">
           <div>
@@ -80,8 +78,8 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="min-h-[400px] max-h-[600px] overflow-hidden border rounded-md p-0 bg-muted/30">
-        {isLoading && <Skeleton className="w-full h-full min-h-[380px]" />}
+      <CardContent className="flex-grow overflow-hidden border rounded-md p-0 bg-muted/30"> {/* Changed to flex-grow */}
+        {isLoading && <Skeleton className="w-full h-full" />}
         {error && !isLoading && (
           <div className="p-4">
             <Alert variant="destructive">
@@ -95,8 +93,8 @@ export function HtmlPreview({ proposalId, documentId, currentPage }: HtmlPreview
             key={iframeKey}
             src={htmlViewUrl}
             title={`HTML Preview for Page ${currentPage}`}
-            className="w-full h-full min-h-[380px] border-0"
-            sandbox="allow-same-origin" // Adjust sandbox attributes as needed for security vs functionality
+            className="w-full h-full border-0" 
+            sandbox="allow-same-origin" 
             data-ai-hint="document page html content"
           />
         )}

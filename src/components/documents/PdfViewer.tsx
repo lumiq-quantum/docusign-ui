@@ -12,7 +12,7 @@ interface PdfViewerProps {
   documentId: number;
   totalPages: number;
   currentPage: number;
-  onPageChange: (newPage: number) => void; // Kept for potential future use, though not used by internal controls now
+  onPageChange: (newPage: number) => void;
 }
 
 export function PdfViewer({ proposalId, documentId, totalPages, currentPage, onPageChange }: PdfViewerProps) {
@@ -44,18 +44,15 @@ export function PdfViewer({ proposalId, documentId, totalPages, currentPage, onP
   }, [currentPage, fetchPagePdfUrl]);
 
   return (
-    <div className="space-y-4">
-      {/* Pagination controls removed from here */}
-      <div className="p-2 bg-muted/50 rounded-lg min-h-[600px] flex items-center justify-center border">
-        {isLoading && <Skeleton className="w-full h-[700px] max-w-[800px]" data-ai-hint="document page loading" />}
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="p-2 bg-muted/50 rounded-lg flex-grow border flex items-center justify-center">
+        {isLoading && <Skeleton className="w-full h-full" data-ai-hint="document page loading" />}
         {error && !isLoading && <div className="text-red-500 text-center py-10">{error}</div>}
         {!isLoading && !error && pdfUrl && (
           <object
             data={pdfUrl}
             type="application/pdf"
-            width="100%"
-            height="700px" // Adjust height as needed
-            className="shadow-lg" // Removed border as parent has one
+            className="w-full h-full shadow-lg" 
             aria-label={`Document Page ${currentPage} PDF`}
             data-ai-hint="document page content pdf"
           >

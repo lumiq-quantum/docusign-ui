@@ -24,9 +24,9 @@ const PageNavigationSidebar = ({ totalPages, currentPage, onPageChange }: {
   if (totalPages <= 0) return null;
 
   return (
-    <div className="w-48 flex-shrink-0 border-r pr-2">
+    <div className="w-48 flex-shrink-0 border-r pr-2 flex flex-col">
       <h3 className="text-base font-semibold mb-2 px-2 text-muted-foreground">Document Pages</h3>
-      <ScrollArea className="h-[calc(100vh-16rem)]"> {/* Adjusted height */}
+      <ScrollArea className="h-full"> {/* Changed to h-full */}
         <div className="flex flex-col space-y-1 pr-2">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
             <Button
@@ -73,41 +73,36 @@ export default function DocumentViewerPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [fetchedProposalResult, fetchedAllProposalsResult] = await Promise.all([
+      const [proposalResult, allProposalsResult] = await Promise.all([
         getProposalByIdAction(numericProposalId),
         getProposalsAction()
       ]);
 
-      if (fetchedProposalResult.error) {
-        setError(fetchedProposalResult.error);
+      if (proposalResult.error || !proposalResult.proposal) {
+        setError(proposalResult.error || "Proposal not found.");
         setProposal(null);
         setDocument(null);
-      } else if (fetchedProposalResult.proposal) {
-        setProposal(fetchedProposalResult.proposal);
-        const foundDoc = fetchedProposalResult.proposal.documents.find(d => d.id === numericDocumentId);
+      } else {
+        setProposal(proposalResult.proposal);
+        const foundDoc = proposalResult.proposal.documents.find(d => d.id === numericDocumentId);
         if (foundDoc) {
           setDocument(foundDoc);
-          // Ensure currentPageNumber is valid for the new document
           if (foundDoc.totalPages > 0 && currentPageNumber > foundDoc.totalPages) {
             setCurrentPageNumber(1);
           } else if (foundDoc.totalPages === 0) {
-            setCurrentPageNumber(1); // Or handle no pages case
+            setCurrentPageNumber(1);
           }
         } else {
           setError("Document not found in the proposal.");
           setDocument(null);
         }
-      } else {
-        setError("Proposal not found.");
-        setProposal(null);
-        setDocument(null);
       }
 
-      if (fetchedAllProposalsResult.error) {
-        console.warn("Could not load all proposals for sidebar", fetchedAllProposalsResult.error);
+      if (allProposalsResult.error) {
+        console.warn("Could not load all proposals for sidebar", allProposalsResult.error);
         setAllProposals([]);
       } else {
-        setAllProposals(fetchedAllProposalsResult.proposals || []);
+        setAllProposals(allProposalsResult.proposals || []);
       }
 
     } catch (e: any) {
@@ -116,7 +111,7 @@ export default function DocumentViewerPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [proposalIdStr, documentIdStr, currentPageNumber]); // Added currentPageNumber to ensure reset if needed
+  }, [proposalIdStr, documentIdStr, currentPageNumber]);
 
   useEffect(() => {
     fetchDocumentDetails();
@@ -126,7 +121,6 @@ export default function DocumentViewerPage() {
     if (document && newPage >= 1 && newPage <= document.totalPages) {
       setCurrentPageNumber(newPage);
     } else if (document && document.totalPages === 0 && newPage === 1) {
-      // Allows setting to 1 if totalPages is 0, though UI might not show pages
       setCurrentPageNumber(newPage);
     }
   };
@@ -135,16 +129,16 @@ export default function DocumentViewerPage() {
     return (
       <AppShell recentProposals={allProposals}>
         <PageHeader title={<Skeleton className="h-8 w-3/4" />} description={<Skeleton className="h-4 w-1/2 mt-1" />} />
-        <div className="flex flex-row mt-2">
+        <div className="flex flex-row mt-2 flex-1"> {/* Added flex-1 */}
           <div className="w-48 flex-shrink-0 border-r pr-2">
             <Skeleton className="h-6 w-3/4 mb-3 px-2" />
-            <div className="space-y-1 pr-2">
-              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+            <div className="space-y-1 pr-2 h-[calc(100vh-20rem)]"> {/* Approx height */}
+              {[...Array(10)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
             </div>
           </div>
-          <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
-            <Skeleton className="h-[600px] w-full" />
-            <Skeleton className="h-[600px] w-full" />
+          <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 pl-6 h-full">
+            <Skeleton className="h-full min-h-[600px] w-full" />
+            <Skeleton className="h-full min-h-[600px] w-full" />
           </div>
         </div>
       </AppShell>
@@ -185,7 +179,7 @@ export default function DocumentViewerPage() {
       </Button>
       <PageHeader title={document.name} description={`Viewing page ${currentPageNumber} of ${document.totalPages > 0 ? document.totalPages : 'N/A' }`} />
 
-      <div className="flex flex-1 mt-2">
+      <div className="flex flex-1 mt-2" style={{ height: 'calc(100vh - var(--header-height, 10rem) - 4rem)' }}> {/* Adjust header-height approximation as needed */}
         {document.totalPages > 0 && (
           <PageNavigationSidebar
             totalPages={document.totalPages}
@@ -193,10 +187,10 @@ export default function DocumentViewerPage() {
             onPageChange={handlePageChange}
           />
         )}
-        <div className={`flex-grow grid grid-cols-1 ${document.totalPages > 0 ? 'md:grid-cols-2 pl-6' : 'md:grid-cols-1'} gap-6`}>
+        <div className={`flex-grow grid grid-cols-1 ${document.totalPages > 0 ? 'md:grid-cols-2 pl-6' : 'md:grid-cols-1'} gap-6 h-full`}>
           {document.totalPages > 0 ? (
             <>
-              <div>
+              <div className="h-full">
                 <PdfViewer
                   proposalId={proposal.id}
                   documentId={document.id}
@@ -205,7 +199,7 @@ export default function DocumentViewerPage() {
                   onPageChange={handlePageChange}
                 />
               </div>
-              <div>
+              <div className="h-full">
                 <HtmlPreview
                   proposalId={proposal.id}
                   documentId={document.id}
@@ -223,4 +217,3 @@ export default function DocumentViewerPage() {
     </AppShell>
   );
 }
-
