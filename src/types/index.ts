@@ -1,4 +1,5 @@
 
+
 // Maps to ProjectResponse in OpenAPI
 export interface Proposal {
   id: number;
@@ -8,7 +9,7 @@ export interface Proposal {
   documents: Document[]; // from documents in ProjectResponse
   signatureAnalysisStatus: string | null; // from signature_analysis_status
   signatureAnalysisReportHtml?: string | null; // from signature_analysis_report_html
-  // chat_session_id from API is not currently used in UI.
+  chatSessionId?: string | null; // from chat_session_id
 }
 
 // Maps to DocumentResponse in OpenAPI
@@ -19,6 +20,7 @@ export interface Document {
   totalPages: number; // from total_pages
   projectId: number; // from project_id
   pages: Page[]; // from pages in DocumentResponse
+  chatSessionId?: string | null; // Assuming this can be provided by the API
 }
 
 // Maps to PageResponse in OpenAPI
@@ -50,14 +52,21 @@ export interface Signature {
 }
 
 // For API responses that might not be full Proposal/Document objects initially
-export interface ApiProposal extends Omit<Proposal, 'documents'> {
+export interface ApiProposal extends Omit<Proposal, 'documents' | 'chatSessionId'> {
+  application_number: string | null;
+  created_at: string;
+  signature_analysis_status: string | null;
+  signature_analysis_report_html?: string | null;
+  chat_session_id?: string | null;
   documents: ApiDocument[];
 }
 
-export interface ApiDocument extends Omit<Document, 'pages'> {
+export interface ApiDocument extends Omit<Document, 'pages' | 'chatSessionId'> {
   file_name: string;
   project_id: number;
   created_at: string;
+  total_pages: number;
+  chat_session_id?: string | null; // Assuming API provides this
   pages: ApiPage[];
 }
 
@@ -87,4 +96,25 @@ export interface ApiSignature {
 export interface ProposalCreatePayload {
   name: string;
   chat_session_id?: string | null;
+}
+
+// Chat specific types
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  content: string;
+  timestamp: string; // ISO date string
+  file_uri?: string | null;
+  file_mime_type?: string | null;
+}
+
+export interface ChatSessionInfo {
+  id: string;
+  title: string;
+  created_at: string; // ISO date string
+}
+
+export interface ChatHistoryResponse {
+  session: ChatSessionInfo;
+  messages: ChatMessage[];
 }

@@ -14,7 +14,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getProposalByIdAction, getProposalsAction } from '@/lib/actions';
 import type { Document, Proposal } from '@/types';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ChatInterface } from '@/components/chat/ChatInterface';
+
 
 const PageNavigationSidebar = ({ totalPages, currentPage, onPageChange }: {
   totalPages: number;
@@ -26,7 +29,7 @@ const PageNavigationSidebar = ({ totalPages, currentPage, onPageChange }: {
   return (
     <div className="w-48 flex-shrink-0 border-r pr-2 flex flex-col">
       <h3 className="text-base font-semibold mb-2 px-2 text-muted-foreground">Document Pages</h3>
-      <ScrollArea className="h-full"> {/* Changed to h-full */}
+      <ScrollArea className="h-full">
         <div className="flex flex-col space-y-1 pr-2">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
             <Button
@@ -57,6 +60,7 @@ export default function DocumentViewerPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPageNumber, setCurrentPageNumber] = useState(1);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const fetchDocumentDetails = useCallback(async () => {
     if (!proposalIdStr || !documentIdStr) return;
@@ -125,14 +129,29 @@ export default function DocumentViewerPage() {
     }
   };
 
+  const pageHeaderActions = document?.chatSessionId ? (
+    <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
+      <SheetTrigger asChild>
+        <Button variant="outline" size="sm">
+          <MessageSquare className="mr-2 h-4 w-4" />
+          Chat about Document
+        </Button>
+      </SheetTrigger>
+      <SheetContent className="sm:max-w-lg w-full p-0">
+        <ChatInterface sessionId={document.chatSessionId} chatTitleProp={`Chat: ${document.name}`} />
+      </SheetContent>
+    </Sheet>
+  ) : null;
+
+
   if (isLoading) {
     return (
       <AppShell recentProposals={allProposals}>
         <PageHeader title={<Skeleton className="h-8 w-3/4" />} description={<Skeleton className="h-4 w-1/2 mt-1" />} />
-        <div className="flex flex-row mt-2 flex-1"> {/* Added flex-1 */}
+        <div className="flex flex-row mt-2 flex-1">
           <div className="w-48 flex-shrink-0 border-r pr-2">
             <Skeleton className="h-6 w-3/4 mb-3 px-2" />
-            <div className="space-y-1 pr-2 h-[calc(100vh-20rem)]"> {/* Approx height */}
+            <div className="space-y-1 pr-2 h-[calc(100vh-20rem)]"> 
               {[...Array(10)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
             </div>
           </div>
@@ -171,15 +190,22 @@ export default function DocumentViewerPage() {
 
   return (
     <AppShell recentProposals={allProposals}>
-      <Button variant="outline" size="sm" asChild className="mb-4">
-        <Link href={`/proposals/${proposal.id}`}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Proposal: {proposal.name}
-        </Link>
-      </Button>
-      <PageHeader title={document.name} description={`Viewing page ${currentPageNumber} of ${document.totalPages > 0 ? document.totalPages : 'N/A' }`} />
+      <div className="flex justify-between items-center mb-4">
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/proposals/${proposal.id}`}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Proposal: {proposal.name}
+          </Link>
+        </Button>
+        {pageHeaderActions}
+      </div>
+      
+      <PageHeader 
+        title={document.name} 
+        description={`Viewing page ${currentPageNumber} of ${document.totalPages > 0 ? document.totalPages : 'N/A' }`}
+      />
 
-      <div className="flex flex-1 mt-2" style={{ height: 'calc(100vh - var(--header-height, 10rem) - 4rem)' }}> {/* Adjust header-height approximation as needed */}
+      <div className="flex flex-1 mt-2" style={{ height: 'calc(100vh - var(--header-height, 10rem) - 4rem)' }}>
         {document.totalPages > 0 && (
           <PageNavigationSidebar
             totalPages={document.totalPages}

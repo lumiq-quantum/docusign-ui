@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getProposalByIdAction, getProposalsAction, startSignatureAnalysisAction, deleteProposalAction } from '@/lib/actions';
 import type { Proposal, Document } from '@/types';
-import { ArrowLeft, FileText, BarChart, CheckCircle, Clock, AlertCircle, RefreshCw, FileSearch, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, BarChart, CheckCircle, Clock, AlertCircle, RefreshCw, FileSearch, Trash2, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -28,6 +28,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ChatInterface } from '@/components/chat/ChatInterface';
 
 export default function ProposalDetailPage() {
   const params = useParams();
@@ -42,6 +44,7 @@ export default function ProposalDetailPage() {
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchProposalData = useCallback(async (isFullLoad = true) => {
@@ -145,14 +148,12 @@ export default function ProposalDetailPage() {
       setIsDeleting(false);
       setIsDeleteAlertOpen(false);
     }
-    // No finally for setIsDeleting and setIsDeleteAlertOpen as it's handled on error or success navigation
   };
   
   const SignatureStatusIndicator = () => {
     if (!proposal || !proposal.signatureAnalysisStatus) return <Badge variant="outline">Not Started</Badge>;
     const status = proposal.signatureAnalysisStatus.toLowerCase();
     switch (status) {
-      case 'completed':
       case 'completed_success':
         return <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="mr-1 h-3 w-3" />Completed</Badge>;
       case 'in progress':
@@ -203,7 +204,7 @@ export default function ProposalDetailPage() {
   
   const analysisInProgress = proposal.signatureAnalysisStatus?.toLowerCase() === 'in progress' || proposal.signatureAnalysisStatus?.toLowerCase() === 'inprogress';
   const currentStatusLower = proposal.signatureAnalysisStatus?.toLowerCase();
-  const isCompletedSuccessfully = currentStatusLower === 'completed' || currentStatusLower === 'completed_success';
+  const isCompletedSuccessfully = currentStatusLower === 'completed_success';
 
 
   return (
@@ -213,28 +214,43 @@ export default function ProposalDetailPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
         </Button>
-        <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" size="sm" disabled={isDeleting}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              {isDeleting ? "Deleting..." : "Delete Proposal"}
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the proposal "{proposal.name}" and all associated documents.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteProposal} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                 {isDeleting ? "Deleting..." : "Yes, delete proposal"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <div className="flex items-center gap-2">
+          {proposal.chatSessionId && (
+            <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Chat
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="sm:max-w-lg w-full p-0">
+                <ChatInterface sessionId={proposal.chatSessionId} chatTitleProp={`Chat: ${proposal.name}`} />
+              </SheetContent>
+            </Sheet>
+          )}
+          <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={isDeleting}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                {isDeleting ? "Deleting..." : "Delete Proposal"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the proposal "{proposal.name}" and all associated documents.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteProposal} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                  {isDeleting ? "Deleting..." : "Yes, delete proposal"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       <PageHeader
