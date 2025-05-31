@@ -28,56 +28,72 @@ export default function ProposalDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
   const { toast } = useToast();
 
-  const fetchProposalDetails = useCallback(async () => {
+  const fetchProposalData = useCallback(async (isFullLoad = true) => {
     if (!proposalId) return;
     
     const numericProposalId = parseInt(proposalId, 10);
     if (isNaN(numericProposalId)) {
         setError("Invalid Proposal ID format.");
-        setIsLoading(false);
+        if (isFullLoad) setIsLoading(false);
         return;
     }
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Fetch both proposal details and list of all proposals for sidebar concurrently
-      const [fetchedProposalResult, fetchedAllProposalsResult] = await Promise.all([
-        getProposalByIdAction(numericProposalId),
-        getProposalsAction() // For sidebar
-      ]);
+    if (isFullLoad) {
+      setIsLoading(true);
+      setError(null);
+    } else {
+      setIsRefreshingStatus(true);
+    }
 
+    try {
+      const promises = [getProposalByIdAction(numericProposalId)];
+      if (isFullLoad) {
+        promises.push(getProposalsAction());
+      }
+
+      const results = await Promise.all(promises);
+      const fetchedProposalResult = results[0] as { proposal?: Proposal; error?: string };
+      
       if (fetchedProposalResult.error) {
-        setError(fetchedProposalResult.error);
+        if (isFullLoad) setError(fetchedProposalResult.error);
+        else toast({ title: "Refresh Error", description: fetchedProposalResult.error, variant: "destructive" });
         setProposal(null);
       } else {
         setProposal(fetchedProposalResult.proposal || null);
-         if (!fetchedProposalResult.proposal) setError("Proposal not found.");
+         if (!fetchedProposalResult.proposal && isFullLoad) setError("Proposal not found.");
+         else if (!fetchedProposalResult.proposal && !isFullLoad) toast({title: "Info", description: "Proposal data not found on refresh."})
+
       }
 
-      if (fetchedAllProposalsResult.error) {
-        console.warn("Failed to load all proposals for sidebar:", fetchedAllProposalsResult.error);
-        setAllProposals([]);
-      } else {
-        setAllProposals(fetchedAllProposalsResult.proposals || []);
+      if (isFullLoad) {
+        const fetchedAllProposalsResult = results[1] as { proposals?: Proposal[]; error?: string };
+        if (fetchedAllProposalsResult.error) {
+          console.warn("Failed to load all proposals for sidebar:", fetchedAllProposalsResult.error);
+          setAllProposals([]);
+        } else {
+          setAllProposals(fetchedAllProposalsResult.proposals || []);
+        }
       }
 
     } catch (e: any) {
-      setError("Failed to load proposal details: " + e.message);
+      if (isFullLoad) setError("Failed to load proposal details: " + e.message);
+      else toast({ title: "Refresh Error", description: "Failed to refresh: " + e.message, variant: "destructive"});
       console.error(e);
     } finally {
-      setIsLoading(false);
+      if (isFullLoad) setIsLoading(false);
+      else setIsRefreshingStatus(false);
     }
-  }, [proposalId]);
+  }, [proposalId, toast]); // Removed allProposals from deps to avoid loop with conditional fetch
 
   useEffect(() => {
-    fetchProposalDetails();
-  }, [fetchProposalDetails]);
+    fetchProposalData(true); // Initial full load
+  }, [fetchProposalData]);
 
   const handleUploadComplete = (newDocument: Document) => {
-    fetchProposalDetails(); // Re-fetch to update list and proposal details
+    fetchProposalData(false); // Re-fetch only proposal to update list and details
   };
 
   const handleStartAnalysis = async () => {
@@ -89,9 +105,7 @@ export default function ProposalDetailPage() {
         toast({ title: "Analysis Error", description: result.error, variant: "destructive" });
       } else {
         toast({ title: "Analysis Started", description: result.message || "Signature analysis is in progress." });
-        // Re-fetch to get updated status from backend
-        // Add a small delay to give backend time to update status potentially
-        setTimeout(fetchProposalDetails, 2000); 
+        setTimeout(() => fetchProposalData(false), 3000); // Refresh proposal data after a delay
       }
     } catch (e: any) {
       toast({ title: "Analysis Error", description: "An unexpected error occurred: " + e.message, variant: "destructive" });
@@ -153,6 +167,7 @@ export default function ProposalDetailPage() {
   }
   
   const analysisInProgress = proposal.signatureAnalysisStatus?.toLowerCase() === 'in progress' || proposal.signatureAnalysisStatus?.toLowerCase() === 'inprogress';
+  const currentStatusLower = proposal.signatureAnalysisStatus?.toLowerCase();
 
 
   return (
@@ -195,17 +210,22 @@ export default function ProposalDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium">Status:</p>
+                <div className="flex items-center">
+                    <p className="text-sm font-medium">Status:</p>
+                    <Button variant="ghost" size="icon" onClick={() => fetchProposalData(false)} className="ml-1 h-7 w-7" title="Refresh status" disabled={isAnalyzing || isRefreshingStatus}>
+                        <RefreshCw className={`h-4 w-4 ${(isAnalyzing || isRefreshingStatus) ? 'animate-spin' : ''}`} />
+                    </Button>
+                </div>
                 <SignatureStatusIndicator />
               </div>
-              {proposal.signatureAnalysisStatus?.toLowerCase() === 'completed' && proposal.signatureAnalysisReportHtml && (
+              {currentStatusLower === 'completed' && proposal.signatureAnalysisReportHtml && (
                  <Alert className="mb-3">
                   <CheckCircle className="h-4 w-4" />
                   <AlertTitle>Analysis Complete</AlertTitle>
                   <AlertDescription className="text-xs">Report is available.</AlertDescription>
                 </Alert>
               )}
-              {proposal.signatureAnalysisStatus?.toLowerCase() === 'failed' && (
+              {currentStatusLower === 'failed' && (
                  <Alert variant="destructive" className="mb-3">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Analysis Failed</AlertTitle>
@@ -216,17 +236,17 @@ export default function ProposalDetailPage() {
             <CardFooter className="flex-col items-stretch space-y-2">
               <Button
                 onClick={handleStartAnalysis}
-                disabled={isAnalyzing || analysisInProgress || !proposal.documents || proposal.documents.length === 0}
+                disabled={isAnalyzing || analysisInProgress || isRefreshingStatus || !proposal.documents || proposal.documents.length === 0}
                 className="w-full"
               >
-                {isAnalyzing || analysisInProgress ? (
+                {isAnalyzing || (analysisInProgress && isRefreshingStatus) ? ( // Show spinner if analyzing or refreshing while in progress
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <FileSearch className="mr-2 h-4 w-4" />
                 )}
-                {proposal.signatureAnalysisStatus === 'Completed' || proposal.signatureAnalysisStatus === 'Failed' ? 'Re-analyze Signatures' : 'Start Signature Analysis'}
+                {currentStatusLower === 'completed' || currentStatusLower === 'failed' ? 'Re-analyze Signatures' : 'Start Signature Analysis'}
               </Button>
-              {proposal.signatureAnalysisStatus?.toLowerCase() === 'completed' && (
+              {currentStatusLower === 'completed' && (
                 <Button variant="outline" className="w-full" asChild>
                   <Link href={`/proposals/${proposal.id}/signature-analysis/report`}>
                     View Analysis Report
@@ -240,3 +260,6 @@ export default function ProposalDetailPage() {
     </AppShell>
   );
 }
+
+
+    
