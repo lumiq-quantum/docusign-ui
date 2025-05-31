@@ -12,7 +12,7 @@ interface PdfViewerProps {
   documentId: number;
   totalPages: number;
   currentPage: number;
-  onPageChange: (newPage: number) => void;
+  onPageChange: (newPage: number) => void; // Kept for potential future use, though not used by internal controls now
 }
 
 export function PdfViewer({ proposalId, documentId, totalPages, currentPage, onPageChange }: PdfViewerProps) {
@@ -45,34 +45,8 @@ export function PdfViewer({ proposalId, documentId, totalPages, currentPage, onP
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end p-2 border-b bg-card rounded-t-lg">
-        {/* Zoom controls removed as browser's PDF viewer will handle this */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage <= 1 || isLoading}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            <span className="sr-only">Previous Page</span>
-          </Button>
-          <span className="text-sm font-medium">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage >= totalPages || isLoading}
-          >
-            <ChevronRight className="h-4 w-4" />
-            <span className="sr-only">Next Page</span>
-          </Button>
-        </div>
-      </div>
-
-      <div className="p-2 bg-muted/50 rounded-b-lg min-h-[600px] flex items-center justify-center">
+      {/* Pagination controls removed from here */}
+      <div className="p-2 bg-muted/50 rounded-lg min-h-[600px] flex items-center justify-center border">
         {isLoading && <Skeleton className="w-full h-[700px] max-w-[800px]" data-ai-hint="document page loading" />}
         {error && !isLoading && <div className="text-red-500 text-center py-10">{error}</div>}
         {!isLoading && !error && pdfUrl && (
@@ -81,7 +55,7 @@ export function PdfViewer({ proposalId, documentId, totalPages, currentPage, onP
             type="application/pdf"
             width="100%"
             height="700px" // Adjust height as needed
-            className="shadow-lg border"
+            className="shadow-lg" // Removed border as parent has one
             aria-label={`Document Page ${currentPage} PDF`}
             data-ai-hint="document page content pdf"
           >
@@ -98,3 +72,4 @@ export function PdfViewer({ proposalId, documentId, totalPages, currentPage, onP
     </div>
   );
 }
+
