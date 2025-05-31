@@ -105,8 +105,8 @@ export function ProposalCard({ proposal, onProposalDeleted }: ProposalCardProps)
           </Badge>
         </div>
       </CardContent>
-      <CardFooter className="flex flex-col sm:flex-row gap-2">
-        <Button asChild variant="outline" className="w-full sm:w-auto flex-grow">
+      <CardFooter className="flex justify-between items-center">
+        <Button asChild variant="outline" className="flex-grow mr-2">
           <Link href={`/proposals/${proposal.id}`}>
             View Details
             <ArrowRight className="ml-2 h-4 w-4" />
@@ -114,9 +114,8 @@ export function ProposalCard({ proposal, onProposalDeleted }: ProposalCardProps)
         </Button>
         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
           <AlertDialogTrigger asChild>
-            <Button variant="destructive" className="w-full sm:w-auto" disabled={isDeleting}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              {isDeleting ? "Deleting..." : "Delete"}
+            <Button variant="destructive" size="icon" disabled={isDeleting} aria-label="Delete proposal">
+              <Trash2 className="h-4 w-4" />
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
