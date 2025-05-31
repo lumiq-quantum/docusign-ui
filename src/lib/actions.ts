@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import type { Proposal, Document, Signature, Page, ProposalCreatePayload, ApiProposal, ApiDocument, ApiPage, ApiSignature, ChatHistoryResponse, ChatMessage } from '@/types';
+import type { Proposal, Document, Signature, Page, ProposalCreatePayload, ApiProposal, ApiDocument, ApiPage, ApiSignature, ChatHistoryResponse, SignatureAnalysisReportData, SignatureAnalysisReportDataSchema } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 const CHAT_API_BASE_URL = process.env.NEXT_PUBLIC_CHAT_API_BASE_URL || '';
@@ -255,7 +255,6 @@ export function getDocumentPagePdfUrlAction(proposalId: number, documentId: numb
   }
 }
 
-// Returns the URL for direct HTML view via iframe
 export function getDocumentPageHtmlViewUrlAction(proposalId: number, documentId: number, pageNumber: number): { url?: string; error?: string } {
   if (!API_BASE_URL) {
     console.error(`getDocumentPageHtmlViewUrlAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
@@ -270,8 +269,6 @@ export function getDocumentPageHtmlViewUrlAction(proposalId: number, documentId:
   }
 }
 
-
-// Action to delete a proposal
 export async function deleteProposalAction(proposalId: number): Promise<{ success?: boolean; error?: string }> {
   if (!API_BASE_URL) {
     console.error(`deleteProposalAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
@@ -294,9 +291,6 @@ export async function deleteProposalAction(proposalId: number): Promise<{ succes
     return { error: `An unexpected error occurred while deleting the proposal from ${API_BASE_URL}. Is the API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
-
-
-// Chat Actions
 
 export async function getChatHistoryAction(sessionId: string): Promise<{ history?: ChatHistoryResponse; error?: string }> {
   if (!CHAT_API_BASE_URL) {
@@ -338,8 +332,6 @@ export async function sendChatMessageAction(sessionId: string, message: string):
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-      // The send message API might not return JSON on error, or might return an HTML error page if it's a different framework.
-      // So, prioritize errorData.detail, then response.statusText
       let errorMessage = `Failed to send message: HTTP ${response.status}`;
       if (errorData && errorData.detail) {
           errorMessage = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
@@ -348,10 +340,37 @@ export async function sendChatMessageAction(sessionId: string, message: string):
       }
       return { error: `${errorMessage} from ${CHAT_API_BASE_URL}/chat/${sessionId}/message` };
     }
-    // Assuming a successful POST returns 200/201/204 without necessarily a body, or a simple success message
     return { success: true };
   } catch (error) {
     console.error("sendChatMessageAction error:", error);
     return { error: `An unexpected error occurred while sending message via ${CHAT_API_BASE_URL}. Is the Chat API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+export async function getSignatureAnalysisReportDataAction(proposalId: number): Promise<{ reportData?: SignatureAnalysisReportData; error?: string }> {
+  if (!API_BASE_URL) {
+    console.error(`getSignatureAnalysisReportDataAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
+    return { error: API_NOT_CONFIGURED_ERROR('NEXT_PUBLIC_API_BASE_URL', API_BASE_URL) };
+  }
+  if (!proposalId) return { error: "Proposal ID is required." };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/proposals/${proposalId}/signature-analysis/report`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+      return { error: errorData.detail || `Failed to fetch signature analysis report data: HTTP ${response.status} from ${API_BASE_URL}/proposals/${proposalId}/signature-analysis/report` };
+    }
+    const jsonData: unknown = await response.json();
+    
+    const validationResult = SignatureAnalysisReportDataSchema.safeParse(jsonData);
+    if (!validationResult.success) {
+      console.error("Zod validation error for signature report data:", validationResult.error.format());
+      return { error: `Invalid data structure received from API for signature analysis report. Details: ${validationResult.error.message}` };
+    }
+    
+    return { reportData: validationResult.data };
+  } catch (error) {
+    console.error("getSignatureAnalysisReportDataAction error:", error);
+    return { error: `An unexpected error occurred while fetching signature analysis report data from ${API_BASE_URL}. Is the API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
