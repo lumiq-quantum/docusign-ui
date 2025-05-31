@@ -12,8 +12,10 @@ interface ProposalCardProps {
 
 const StatusIcon = ({ status }: { status: Proposal['signatureAnalysisStatus'] }) => {
   if (!status) return <Clock className="h-4 w-4 text-muted-foreground" />;
-  switch (status.toLowerCase()) {
+  const lowerStatus = status.toLowerCase();
+  switch (lowerStatus) {
     case 'completed':
+    case 'completed_success':
       return <CheckCircle className="h-4 w-4 text-green-500" />;
     case 'in progress':
     case 'inprogress':
@@ -28,6 +30,22 @@ const StatusIcon = ({ status }: { status: Proposal['signatureAnalysisStatus'] })
 export function ProposalCard({ proposal }: ProposalCardProps) {
   const formattedDate = new Date(proposal.createdAt).toLocaleDateString();
   const signatureStatus = proposal.signatureAnalysisStatus || 'Not Started';
+  const lowerSignatureStatus = signatureStatus.toLowerCase();
+
+  let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "outline";
+  let statusText = signatureStatus;
+
+  if (lowerSignatureStatus === 'completed' || lowerSignatureStatus === 'completed_success') {
+    badgeVariant = 'default';
+    statusText = 'Completed';
+  } else if (lowerSignatureStatus === 'in progress' || lowerSignatureStatus === 'inprogress') {
+    badgeVariant = 'secondary';
+    statusText = 'In Progress';
+  } else if (lowerSignatureStatus === 'failed') {
+    badgeVariant = 'destructive';
+    statusText = 'Failed';
+  }
+
 
   return (
     <Card className="flex flex-col h-full">
@@ -45,12 +63,8 @@ export function ProposalCard({ proposal }: ProposalCardProps) {
         <div className="flex items-center text-sm">
           <StatusIcon status={signatureStatus} />
           <span className="ml-2">Signature Analysis:</span>
-          <Badge variant={
-            signatureStatus.toLowerCase() === 'completed' ? 'default' : 
-            signatureStatus.toLowerCase() === 'in progress' || signatureStatus.toLowerCase() === 'inprogress' ? 'secondary' :
-            signatureStatus.toLowerCase() === 'failed' ? 'destructive' : 'outline'
-          } className="ml-2 text-xs">
-            {signatureStatus}
+          <Badge variant={badgeVariant} className="ml-2 text-xs">
+            {statusText}
           </Badge>
         </div>
       </CardContent>

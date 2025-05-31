@@ -86,7 +86,7 @@ export default function ProposalDetailPage() {
       if (isFullLoad) setIsLoading(false);
       else setIsRefreshingStatus(false);
     }
-  }, [proposalId, toast]); // Removed allProposals from deps to avoid loop with conditional fetch
+  }, [proposalId, toast]);
 
   useEffect(() => {
     fetchProposalData(true); // Initial full load
@@ -105,7 +105,8 @@ export default function ProposalDetailPage() {
         toast({ title: "Analysis Error", description: result.error, variant: "destructive" });
       } else {
         toast({ title: "Analysis Started", description: result.message || "Signature analysis is in progress." });
-        setTimeout(() => fetchProposalData(false), 3000); // Refresh proposal data after a delay
+        // Refresh proposal data after a delay to allow backend processing
+        setTimeout(() => fetchProposalData(false), 3000); 
       }
     } catch (e: any) {
       toast({ title: "Analysis Error", description: "An unexpected error occurred: " + e.message, variant: "destructive" });
@@ -119,6 +120,7 @@ export default function ProposalDetailPage() {
     const status = proposal.signatureAnalysisStatus.toLowerCase();
     switch (status) {
       case 'completed':
+      case 'completed_success':
         return <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="mr-1 h-3 w-3" />Completed</Badge>;
       case 'in progress':
       case 'inprogress':
@@ -168,6 +170,7 @@ export default function ProposalDetailPage() {
   
   const analysisInProgress = proposal.signatureAnalysisStatus?.toLowerCase() === 'in progress' || proposal.signatureAnalysisStatus?.toLowerCase() === 'inprogress';
   const currentStatusLower = proposal.signatureAnalysisStatus?.toLowerCase();
+  const isCompletedSuccessfully = currentStatusLower === 'completed' || currentStatusLower === 'completed_success';
 
 
   return (
@@ -218,7 +221,7 @@ export default function ProposalDetailPage() {
                 </div>
                 <SignatureStatusIndicator />
               </div>
-              {currentStatusLower === 'completed' && proposal.signatureAnalysisReportHtml && (
+              {isCompletedSuccessfully && proposal.signatureAnalysisReportHtml && (
                  <Alert className="mb-3">
                   <CheckCircle className="h-4 w-4" />
                   <AlertTitle>Analysis Complete</AlertTitle>
@@ -239,14 +242,14 @@ export default function ProposalDetailPage() {
                 disabled={isAnalyzing || analysisInProgress || isRefreshingStatus || !proposal.documents || proposal.documents.length === 0}
                 className="w-full"
               >
-                {isAnalyzing || (analysisInProgress && isRefreshingStatus) ? ( // Show spinner if analyzing or refreshing while in progress
+                {isAnalyzing || (analysisInProgress && isRefreshingStatus) ? ( 
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <FileSearch className="mr-2 h-4 w-4" />
                 )}
-                {currentStatusLower === 'completed' || currentStatusLower === 'failed' ? 'Re-analyze Signatures' : 'Start Signature Analysis'}
+                {isCompletedSuccessfully || currentStatusLower === 'failed' ? 'Re-analyze Signatures' : 'Start Signature Analysis'}
               </Button>
-              {currentStatusLower === 'completed' && (
+              {isCompletedSuccessfully && (
                 <Button variant="outline" className="w-full" asChild>
                   <Link href={`/proposals/${proposal.id}/signature-analysis/report`}>
                     View Analysis Report
@@ -260,6 +263,3 @@ export default function ProposalDetailPage() {
     </AppShell>
   );
 }
-
-
-    
