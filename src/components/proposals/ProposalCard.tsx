@@ -32,7 +32,6 @@ const StatusIcon = ({ status }: { status: Proposal['signatureAnalysisStatus'] })
   const lowerStatus = status.toLowerCase();
   switch (lowerStatus) {
     case 'completed':
-    case 'completed_success':
       return <CheckCircle className="h-4 w-4 text-green-500" />;
     case 'in progress':
     case 'inprogress':
@@ -55,7 +54,7 @@ export function ProposalCard({ proposal, onProposalDeleted }: ProposalCardProps)
   let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "outline";
   let statusText = signatureStatus;
 
-  if (lowerSignatureStatus === 'completed' || lowerSignatureStatus === 'completed_success') {
+  if (lowerSignatureStatus === 'completed') {
     badgeVariant = 'default';
     statusText = 'Completed';
   } else if (lowerSignatureStatus === 'in progress' || lowerSignatureStatus === 'inprogress') {

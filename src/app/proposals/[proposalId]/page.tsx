@@ -154,7 +154,7 @@ export default function ProposalDetailPage() {
     if (!proposal || !proposal.signatureAnalysisStatus) return <Badge variant="outline">Not Started</Badge>;
     const status = proposal.signatureAnalysisStatus.toLowerCase();
     switch (status) {
-      case 'completed_success':
+      case 'completed':
         return <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="mr-1 h-3 w-3" />Completed</Badge>;
       case 'in progress':
       case 'inprogress':
@@ -204,7 +204,7 @@ export default function ProposalDetailPage() {
   
   const analysisInProgress = proposal.signatureAnalysisStatus?.toLowerCase() === 'in progress' || proposal.signatureAnalysisStatus?.toLowerCase() === 'inprogress';
   const currentStatusLower = proposal.signatureAnalysisStatus?.toLowerCase();
-  const isCompletedSuccessfully = currentStatusLower === 'completed_success';
+  const isCompletedSuccessfully = currentStatusLower === 'completed';
 
 
   return (
