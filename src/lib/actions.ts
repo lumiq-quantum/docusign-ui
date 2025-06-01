@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import type { Proposal, Document, Signature, Page, ProposalCreatePayload, ApiProposal, ApiDocument, ApiPage, ApiSignature, ChatHistoryResponse, SignatureAnalysisReportData, SignatureAnalysisReportDataSchema } from '@/types';
+import type { Proposal, Document, Signature, Page, ProposalCreatePayload, ApiProposal, ApiDocument, ApiPage, ApiSignature, ChatHistoryResponse } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 const CHAT_API_BASE_URL = process.env.NEXT_PUBLIC_CHAT_API_BASE_URL || '';
@@ -344,33 +344,5 @@ export async function sendChatMessageAction(sessionId: string, message: string):
   } catch (error) {
     console.error("sendChatMessageAction error:", error);
     return { error: `An unexpected error occurred while sending message via ${CHAT_API_BASE_URL}. Is the Chat API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
-  }
-}
-
-export async function getSignatureAnalysisReportDataAction(proposalId: number): Promise<{ reportData?: SignatureAnalysisReportData; error?: string }> {
-  if (!API_BASE_URL) {
-    console.error(`getSignatureAnalysisReportDataAction: API_BASE_URL not configured. Current value: "${API_BASE_URL}"`);
-    return { error: API_NOT_CONFIGURED_ERROR('NEXT_PUBLIC_API_BASE_URL', API_BASE_URL) };
-  }
-  if (!proposalId) return { error: "Proposal ID is required." };
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/proposals/${proposalId}/signature-analysis/report`);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-      return { error: errorData.detail || `Failed to fetch signature analysis report data: HTTP ${response.status} from ${API_BASE_URL}/proposals/${proposalId}/signature-analysis/report` };
-    }
-    const jsonData: unknown = await response.json();
-    
-    const validationResult = SignatureAnalysisReportDataSchema.safeParse(jsonData);
-    if (!validationResult.success) {
-      console.error("Zod validation error for signature report data:", validationResult.error.format());
-      return { error: `Invalid data structure received from API for signature analysis report. Details: ${validationResult.error.message}` };
-    }
-    
-    return { reportData: validationResult.data };
-  } catch (error) {
-    console.error("getSignatureAnalysisReportDataAction error:", error);
-    return { error: `An unexpected error occurred while fetching signature analysis report data from ${API_BASE_URL}. Is the API server running? Details: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
