@@ -16,8 +16,8 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
   
   let dateToFormat: Date | null = null;
   if (message.timestamp && typeof message.timestamp === 'string') {
-    // Check if the timestamp string already includes timezone information (Z or +/-HH:MM)
-    if (message.timestamp.endsWith('Z') || /[\+\-]\d{2}:\d{2}$/.test(message.timestamp) || /[\+\-]\d{2}\d{2}$/.test(message.timestamp)) {
+    // Check if the timestamp string already includes timezone information (Z or +/-HH:MM or +/-HHMM)
+    if (message.timestamp.endsWith('Z') || /[\+\-]\d{2}:\d{2}$/.test(message.timestamp) || /[\+\-]\d{4}$/.test(message.timestamp)) {
       dateToFormat = new Date(message.timestamp);
     } else {
       // If no timezone info, assume it's UTC and append 'Z'

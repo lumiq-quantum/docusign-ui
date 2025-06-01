@@ -115,6 +115,3 @@ export interface ChatHistoryResponse {
   session: ChatSessionInfo;
   messages: ChatMessage[];
 }
-
-// Zod Schemas for validation (optional, but good practice if data comes from API)
-// import { z } from 'zod'; // Not needed for this simpler structure anymore

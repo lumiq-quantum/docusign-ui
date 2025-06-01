@@ -10,7 +10,7 @@ import { PdfViewer } from '@/components/documents/PdfViewer';
 import { HtmlPreview } from '@/components/documents/HtmlPreview';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getProposalByIdAction, getProposalsAction } from '@/lib/actions';
 import type { Document, Proposal } from '@/types';
